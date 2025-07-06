@@ -13,11 +13,14 @@ DB_PORT
 DB_NAME
 ```
 ### launch ur owned postgre DB
-### insert the ex data 
+### insert the exp data 
 ```
 pip install requirements.txt 
 python postgre.py
 ```
 ### launch backend service 
+```
+python app.py
+```
 ### preview 
 install the extension : Liveserver to preview the project 
