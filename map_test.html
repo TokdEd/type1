@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>人潮雷達原型 | Azure Maps</title>
+  <meta name="viewport" content="initial-scale=1.0, width=device-width" />
+  <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
+  <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      overflow: hidden;
+    }
+    #map {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0; left: 0;
+      z-index: 0;
+    }
+    #radar-fab {
+      position: fixed;
+      left: 50%;
+      bottom: 4vh;
+      transform: translateX(-50%);
+      width: 64px;
+      height: 64px;
+      background: rgba(255,255,255,0.25);
+      box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.18);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: box-shadow 0.2s, background 0.2s;
+    }
+    #radar-fab:hover {
+      box-shadow: 0 12px 40px 0 rgba(31,38,135,0.45);
+      background: rgba(255,255,255,0.35);
+    }
+    #glass-panel {
+      position: fixed;
+      left: 50%;
+      bottom: 4vh;
+      transform: translateX(-50%) scale(0.98);
+      width: 94vw;
+      max-width: 480px;
+      min-height: 60vh;
+      max-height: 88vh;
+      background: rgba(255,255,255,0.18);
+      box-shadow: 0 12px 48px 0 rgba(31,38,135,0.45);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-radius: 32px;
+      border: 1.5px solid rgba(255,255,255,0.18);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      transition: transform 0.35s cubic-bezier(.4,1.6,.4,1), opacity 0.3s;
+      opacity: 0;
+      pointer-events: none;
+      padding: 32px 18px 20px 18px;
+      box-sizing: border-box;
+    }
+    #glass-panel.open {
+      transform: translateX(-50%) scale(1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    @media (max-width: 600px) {
+      #glass-panel {
+        width: 98vw;
+        max-width: 99vw;
+        min-height: 80vh;
+        left: 50%;
+        bottom: 0;
+        padding: 24px 4vw 16px 4vw;
+      }
+      #chat-history {
+        max-height: 400px;
+      }
+    }
+    #close-panel {
+      position: absolute;
+      top: 18px;
+      right: 24px;
+      background: rgba(0,0,0,0.08);
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 1.2em;
+      color: #333;
+      cursor: pointer;
+      z-index: 40;
+      transition: background 0.2s;
+    }
+    #close-panel:hover {
+      background: rgba(0,0,0,0.18);
+    }
+    #prompt-input {
+      width: 95%;
+      max-width: 520px;
+      padding: 14px 18px;
+      border: 1px solid rgba(200,200,200,0.18);
+      border-radius: 16px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.18);
+      color: #222;
+      font-size: 1.08em;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      outline: none;
+      transition: border 0.2s;
+    }
+    #prompt-input:focus {
+      border: 1.5px solid #0078d4;
+      background: rgba(255,255,255,0.28);
+    }
+    #ask-btn {
+      width: 95%;
+      max-width: 520px;
+      padding: 14px 0;
+      background: rgba(0,120,212,0.22);
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      font-size: 1.08em;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: background 0.2s;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    #ask-btn:hover {
+      background: rgba(0,95,163,0.32);
+    }
+    #advice-title {
+      font-size: 1.2em;
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #222;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.2);
+    }
+    #advice-content {
+      font-size: 1em;
+      color: #333;
+      margin-bottom: 8px;
+      text-align: center;
+      word-break: break-all;
+    }
+    #chat-history {
+      width: 100%;
+      max-width: 520px;
+      min-height: 180px;
+      max-height: 350px;
+      overflow-y: auto;
+      background: rgba(255,255,255,0.13);
+      border-radius: 18px;
+      margin-bottom: 10px;
+      padding: 16px 12px 16px 12px;
+      box-sizing: border-box;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 1em;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .message {
+      padding: 8px 12px;
+      border-radius: 12px;
+      max-width: 90%;
+      word-break: break-word;
+      margin-bottom: 2px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .message.user {
+      align-self: flex-end;
+      background: rgba(0,120,212,0.18);
+      color: #1a2a3a;
+    }
+    .message.ai {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.7);
+      color: #222;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="radar-fab">
+    <canvas id="radar-canvas" width="60" height="60"></canvas>
+  </div>
+  <div id="glass-panel">
+    <button id="close-panel">✕</button>
+    <div id="advice-title">人潮雷達</div>
+    <div id="advice-content">請點選地圖上的檢查點或輸入需求，AI 將根據交通狀況與歷史資料給出最佳建議。</div>
+    <div id="chat-history"></div>
+    <input id="prompt-input" type="text" placeholder="請輸入需求，例如：我想從 a5 經過 a3 到 a2" />
+    <button id="ask-btn">Ask for help</button>
+  </div>
+
+  <script>
+    let key = '';
+    fetch('http://127.0.0.1:5000/api/azure-maps-key')
+      .then(res => res.json())
+      .then(data => {
+        key = data.key;
+        // 取得金鑰後再初始化地圖
+        initMap();
+      });
+
+    function initMap() {
+      const map = new atlas.Map('map', {
+        center: [121.5654, 25.034],
+        zoom: 17,
+        style: 'road', 
+        authOptions: {
+          authType: 'subscriptionKey',
+          subscriptionKey: key
+        }
+      });
+
+      let crowdData = [];
+      let currentLat = null;
+      let currentLon = null;
+
+      async function loadCheckpoints() {
+        const res = await fetch('http://127.0.0.1:5000/api/checkpoints');
+        crowdData = await res.json();
+        
+        // 後端已經計算好 level，直接使用
+        // 不需要再根據 person_count 決定 level
+        addCheckpointsToMap();
+      }
+
+      function addCheckpointsToMap() {
+        crowdData.forEach((checkpoint) => {
+          // 防護檢查：確保 level 存在且有值
+          const level = checkpoint.level || 'unknown';
+          const avgCount = checkpoint.avg_count || checkpoint.person_count || 0;
+          const dataCount = checkpoint.data_count || 0;
+          
+          // 動態顏色計算
+          let markerColor;
+          if (level === 'dynamic' && checkpoint.comparison_ratio !== undefined) {
+            markerColor = getDynamicColor(checkpoint.comparison_ratio);
+          } else {
+            markerColor = crowdColor[level] || 'gray';
+          }
+          
+          const popup = new atlas.Popup({
+            content: `<div style="padding:8px">
+              <b>${checkpoint.name}</b><br>
+              當前平均：<span style="color:${markerColor};font-weight:bold">${avgCount}人</span><br>
+              整體平均：${checkpoint.overall_avg || 'N/A'}人<br>
+              對比值：<span style="color:${markerColor};font-weight:bold">${checkpoint.comparison_ratio || 'N/A'}</span><br>
+              資料筆數：${dataCount}筆<br>
+              擁擠程度：<span style="color:${markerColor};font-weight:bold">${getLevelText(checkpoint.comparison_ratio)}</span>
+            </div>`
+          });
+
+          // 創建自定義的液態玻璃風格圖標
+          const customMarker = document.createElement('div');
+          customMarker.className = 'custom-marker';
+          customMarker.innerHTML = `
+            <div class="marker-glass" style="
+              background: rgba(255,255,255,0.25);
+              backdrop-filter: blur(12px);
+              -webkit-backdrop-filter: blur(12px);
+              border-radius: 16px;
+              border: 1px solid rgba(255,255,255,0.18);
+              padding: 8px 12px;
+              box-shadow: 0 4px 16px rgba(31,38,135,0.3);
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              min-width: 80px;
+              max-width: 120px;
+              transition: all 0.2s ease;
+            ">
+              <div class="marker-dot" style="
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: ${markerColor};
+                box-shadow: 0 0 8px ${markerColor};
+                flex-shrink: 0;
+              "></div>
+              <div class="marker-text" style="
+                color: #222;
+                font-size: 12px;
+                font-weight: 600;
+                text-shadow: 0 1px 2px rgba(255,255,255,0.3);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              ">${checkpoint.name}</div>
+            </div>
+          `;
+
+          // 添加懸停效果
+          customMarker.addEventListener('mouseenter', function() {
+            this.querySelector('.marker-glass').style.transform = 'scale(1.05)';
+            this.querySelector('.marker-glass').style.boxShadow = '0 6px 20px rgba(31,38,135,0.4)';
+          });
+          
+          customMarker.addEventListener('mouseleave', function() {
+            this.querySelector('.marker-glass').style.transform = 'scale(1)';
+            this.querySelector('.marker-glass').style.boxShadow = '0 4px 16px rgba(31,38,135,0.3)';
+          });
+
+          // 創建 Azure Maps 標記
+          const pin = new atlas.HtmlMarker({
+            htmlContent: customMarker,
+            position: [checkpoint.lon, checkpoint.lat],
+            anchor: 'center'
+          });
+
+          map.markers.add(pin);
+          
+          // 綁定點擊事件
+          setTimeout(() => {
+            pin.getElement().addEventListener('click', (e) => {
+              e.stopPropagation();
+              popup.open(map, pin.getOptions().position);
+              map.setCamera({ center: [checkpoint.lon, checkpoint.lat], zoom: 19 });
+            });
+          }, 0);
+        });
+      }
+
+      const crowdColor = {
+        very_low: 'darkgreen',
+        low: 'green',
+        mid: 'orange',
+        high: 'red',
+        unknown: 'gray'
+      };
+
+      map.events.add('ready', function () {
+        // 嘗試獲得使用者即時位置
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(function (position) {
+            currentLat = position.coords.latitude;
+            currentLon = position.coords.longitude;
+
+            map.setCamera({ center: [currentLon, currentLat], zoom: 18 });
+
+            const userPopup = new atlas.Popup({
+              content: `<div style="padding:5px"><b>你在這裡</b></div>`
+            });
+            const userPin = new atlas.HtmlMarker({
+              color: 'blue',
+              text: 'U',
+              position: [currentLon, currentLat]
+            });
+            map.markers.add(userPin);
+            setTimeout(() => {
+              userPin.getElement().addEventListener('click', (e) => {
+                e.stopPropagation();
+                userPopup.open(map, userPin.getOptions().position);
+                map.setCamera({ center: [currentLon, currentLat], zoom: 19 });
+              });
+            }, 0);
+          });
+        }
+
+        loadCheckpoints();
+      });
+
+      function getCurrentTimeString() {
+        const now = new Date();
+        return now.toTimeString().slice(0,5); // 例如 "14:00"
+      }
+
+      const chatHistory = document.getElementById('chat-history');
+
+      function appendMessage(role, text) {
+        const div = document.createElement('div');
+        div.className = 'message ' + (role === 'user' ? 'user' : 'ai');
+        if (role === 'ai') {
+          div.innerHTML = marked.parse(text); // 支援 markdown
+        } else {
+          div.innerText = text;
+        }
+        chatHistory.appendChild(div);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+
+      document.getElementById('ask-btn').addEventListener('click', async () => {
+        const allLocations = crowdData.map(cp => cp.name); // 例如 ["K館", "福利社", ...]
+        const prompt = document.getElementById('prompt-input').value.trim();
+
+        appendMessage('user', prompt);
+        document.getElementById('prompt-input').value = '';
+        appendMessage('ai', 'AI 正在思考中...');
+        console.log('prompt', prompt);
+        const response = await fetch('http://127.0.0.1:5000/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            locations: allLocations,
+            current_location: { lat: currentLat, lon: currentLon },
+            current_time: getCurrentTimeString()
+          })
+        });
+        const data = await response.json();
+
+        // 移除「AI 正在思考中...」
+        const lastMsg = chatHistory.querySelector('.message.ai:last-child');
+        if (lastMsg && lastMsg.innerText === 'AI 正在思考中...') {
+          lastMsg.remove();
+        }
+        appendMessage('ai', data.reply || 'AI 沒有回應');
+      });
+
+      // 畫雷達圖
+      function drawRadar() {
+        const canvas = document.getElementById('radar-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,60,60);
+        // 外圈
+        ctx.globalAlpha = 0.18;
+        ctx.beginPath();
+        ctx.arc(30,30,28,0,2*Math.PI);
+        ctx.fillStyle = '#222';
+        ctx.fill();
+        // 內圈
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(30,30,18,0,2*Math.PI);
+        ctx.fillStyle = '#888';
+        ctx.fill();
+        // 中心
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.arc(30,30,7,0,2*Math.PI);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        // 雷達線
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(30,30);
+        ctx.lineTo(30,5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(30,30);
+        ctx.lineTo(55,30);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      drawRadar();
+
+      // 開關聊天室
+      const radarFab = document.getElementById('radar-fab');
+      const glassPanel = document.getElementById('glass-panel');
+      const closePanel = document.getElementById('close-panel');
+
+      radarFab.addEventListener('click', () => {
+        glassPanel.classList.add('open');
+        radarFab.style.display = 'none';
+      });
+      closePanel.addEventListener('click', () => {
+        glassPanel.classList.remove('open');
+        setTimeout(() => { radarFab.style.display = 'flex'; }, 400);
+      });
+
+      // Enter 送出訊息
+      const promptInput = document.getElementById('prompt-input');
+      promptInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          document.getElementById('ask-btn').click();
+        }
+      });
+
+      // 禁用地圖縮放（假設 map 變數可用）
+      promptInput.addEventListener('focus', function() {
+        if (map && map.controls) {
+          map.controls.remove('zoom');
+        }
+        // 手機自動彈出鍵盤
+        setTimeout(() => promptInput.scrollIntoView({behavior: 'smooth', block: 'center'}), 100);
+      });
+      promptInput.addEventListener('blur', function() {
+        // 恢復地圖縮放
+        // map.controls.add('zoom'); // 根據你的地圖API調整
+      });
+
+      // 動態顏色計算函數
+      function getDynamicColor(ratio) {
+        // ratio 範圍：-1 到 1
+        // -1: 深綠色（很空）
+        // 0: 黃色（正常）
+        // 1: 深紅色（很擁擠）
+        
+        if (ratio <= -0.5) {
+          // 深綠色到綠色
+          const intensity = Math.abs(ratio + 0.5) * 2; // 0 到 1
+          return `rgb(0, ${100 + Math.floor(intensity * 155)}, 0)`;
+        } else if (ratio <= 0) {
+          // 綠色到黃色
+          const intensity = (ratio + 0.5) * 2; // 0 到 1
+          return `rgb(${Math.floor(intensity * 255)}, ${255 - Math.floor(intensity * 100)}, 0)`;
+        } else if (ratio <= 0.5) {
+          // 黃色到橙色
+          const intensity = ratio * 2; // 0 到 1
+          return `rgb(255, ${255 - Math.floor(intensity * 165)}, 0)`;
+        } else {
+          // 橙色到深紅色
+          const intensity = (ratio - 0.5) * 2; // 0 到 1
+          return `rgb(255, ${90 - Math.floor(intensity * 90)}, 0)`;
+        }
+      }
+
+      // 根據對比值取得等級文字
+      function getLevelText(ratio) {
+        if (ratio === undefined || ratio === null) return 'UNKNOWN';
+        
+        if (ratio <= -0.3) return 'VERY LOW';
+        if (ratio <= -0.1) return 'LOW';
+        if (ratio <= 0.1) return 'NORMAL';
+        if (ratio <= 0.3) return 'HIGH';
+        return 'VERY HIGH';
+      }
+    }
+  </script>
+</body>
+</html>
