@@ -62,4 +62,7 @@ jobs:
 
       - name: Deploy to Azure Web App
         run: |
-          az webapp up --name hsh2025ac --resource-group 2025HSHEastUS2 --runtime "PYTHON:3.12"
+          az webapp deployment source config-zip \
+            --resource-group 2025HSHEastUS2 \
+            --name hsh2025ac \
+            --src release.zip
