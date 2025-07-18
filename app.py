@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 import psycopg2
 from datetime import datetime, timedelta
+import math
 
 # 強制重新載入
 load_dotenv(override=True)
@@ -49,8 +50,38 @@ def ask():
     print("查詢時段:", rounded_time)
 
     cur = conn.cursor()
+    
+    # 如果有使用者位置，篩選最近的 10 個地點
+    filtered_locations = locations
+    if current_location and 'lat' in current_location and 'lon' in current_location:
+        user_lat = current_location['lat']
+        user_lon = current_location['lon']
+        
+        # 取得所有地點的座標資料
+        cur.execute("""
+            SELECT DISTINCT location, latitude, longitude
+            FROM people_flow
+            WHERE location = ANY(%s)
+        """, (locations,))
+        location_coords = cur.fetchall()
+        
+        # 計算距離並排序
+        locations_with_distance = []
+        for location, lat, lon in location_coords:
+            if lat is not None and lon is not None:
+                # 計算歐氏距離：sqrt((x1-x2)^2 + (y1-y2)^2)
+                distance = math.sqrt((user_lat - lat)**2 + (user_lon - lon)**2)
+                locations_with_distance.append((location, distance))
+        
+        # 按距離排序，只取前 10 個
+        locations_with_distance.sort(key=lambda x: x[1])
+        filtered_locations = [loc[0] for loc in locations_with_distance[:10]]
+        
+        print(f"使用者位置: ({user_lat}, {user_lon})")
+        print(f"篩選後地點 (前10近): {filtered_locations}")
+    
     historic_data = {}
-    for loc in locations:
+    for loc in filtered_locations:
         cur.execute("""
             SELECT date, person_count
             FROM people_flow
@@ -67,8 +98,8 @@ def ask():
     ai_prompt = f"""使用者目前位置：{current_location}
 目前時間：{current_time}（查詢歷史資料時段：{rounded_time}）
 使用者需求：{prompt}
-歷史人流資料："""
-    for loc in locations:
+歷史人流資料（已篩選距離最近的地點）："""
+    for loc in filtered_locations:
         ai_prompt += f"\n地點 {loc}："
         for record in historic_data[loc]:
             ai_prompt += f"{record['date']} {rounded_time} 人數：{record['person_count']}；"
@@ -140,6 +171,10 @@ def get_current_time_for_query():
 
 @app.route('/api/checkpoints')
 def get_checkpoints():
+    # 接收前端傳來的用戶位置參數
+    user_lat = request.args.get('lat', type=float)
+    user_lon = request.args.get('lon', type=float)
+    
     cur = conn.cursor()
     
     # 使用新的時間計算邏輯
@@ -190,10 +225,35 @@ def get_checkpoints():
             "overall_avg": int(overall_avg),
             "current_data_count": current_data_count,
             "overall_data_count": overall_data_count,
-            "comparison_ratio": float(comparison_ratio)  # 轉換為 float 避免 Decimal 問題
+            "comparison_ratio": float(comparison_ratio),  # 轉換為 float 避免 Decimal 問題
+            "distance": None  # 預設距離為 None
         })
     
-    print(f"回傳資料: {data}")  # Debug 輸出
+    # 如果有用戶位置，計算距離並篩選最近的10個地點
+    if user_lat is not None and user_lon is not None:
+        print(f"用戶位置: ({user_lat}, {user_lon})")
+        
+        # 計算每個地點與用戶的距離
+        for item in data:
+            if item['lat'] is not None and item['lon'] is not None:
+                # 計算歐氏距離：sqrt((x1-x2)^2 + (y1-y2)^2)
+                distance = math.sqrt((user_lat - item['lat'])**2 + (user_lon - item['lon'])**2)
+                item['distance'] = distance
+        
+        # 過濾掉沒有座標的地點，按距離排序，只取前10個
+        data_with_coords = [item for item in data if item['distance'] is not None]
+        data_with_coords.sort(key=lambda x: x['distance'])
+        data = data_with_coords[:10]
+        
+        print(f"篩選後地點 (最近10個): {[item['name'] for item in data]}")
+    else:
+        print("沒有提供用戶位置，顯示所有地點")
+    
+    # 重新分配 ID
+    for i, item in enumerate(data):
+        item['id'] = i + 1
+    
+    print(f"回傳資料筆數: {len(data)}")
     return jsonify(data)
 
 @app.route('/api/azure-maps-key')

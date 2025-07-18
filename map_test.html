@@ -367,8 +367,18 @@
       let currentLon = null;
 
       async function loadCheckpoints() {
-        const res = await fetch('/api/checkpoints');
+        // 構建 API URL，如果有用戶位置就加上參數
+        let apiUrl = '/api/checkpoints';
+        if (currentLat !== null && currentLon !== null) {
+          apiUrl += `?lat=${currentLat}&lon=${currentLon}`;
+          console.log(`使用用戶位置 (${currentLat}, ${currentLon}) 篩選最近的地點`);
+        } else {
+          console.log('沒有用戶位置，顯示所有地點');
+        }
+        
+        const res = await fetch(apiUrl);
         crowdData = await res.json();
+        console.log(`載入了 ${crowdData.length} 個地點`);
         
         // 後端已經計算好 level，直接使用
         // 不需要再根據 person_count 決定 level
@@ -480,13 +490,16 @@
       };
 
       map.events.add('ready', function () {
+        // 先載入地點資料（沒有位置篩選）
+        loadCheckpoints();
+        
         // 嘗試獲得使用者即時位置
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(function (position) {
             currentLat = position.coords.latitude;
             currentLon = position.coords.longitude;
-            //currentLat = 35.63278
-            //currentLon = 139.88056
+            currentLat = 35.6329
+            currentLon = 139.88056
             map.setCamera({ center: [currentLon, currentLat], zoom: 18 });
 
             const userPopup = new atlas.Popup({
@@ -505,10 +518,17 @@
                 map.setCamera({ center: [currentLon, currentLat], zoom: 19 });
               });
             }, 0);
+            
+            // 位置設定完成後，重新載入地點資料（使用距離篩選）
+            console.log('用戶位置已設定，重新載入最近的地點');
+            // 清除現有的地圖標記
+            map.markers.clear();
+            // 重新添加用戶標記
+            map.markers.add(userPin);
+            // 重新載入地點資料
+            loadCheckpoints();
           });
         }
-
-        loadCheckpoints();
       });
 
       function getCurrentTimeString() {
