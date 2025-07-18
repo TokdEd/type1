@@ -109,6 +109,120 @@
     #close-panel:hover {
       background: rgba(0,0,0,0.18);
     }
+    #settings-panel {
+      position: absolute;
+      top: 18px;
+      left: 24px;
+      background: rgba(0,0,0,0.08);
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 1.2em;
+      color: #333;
+      cursor: pointer;
+      z-index: 40;
+      transition: background 0.2s;
+    }
+    #settings-panel:hover {
+      background: rgba(0,0,0,0.18);
+    }
+    #settings-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #settings-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #settings-form {
+      background: rgba(255,255,255,0.25);
+      box-shadow: 0 12px 48px 0 rgba(31,38,135,0.45);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-radius: 24px;
+      border: 1.5px solid rgba(255,255,255,0.18);
+      padding: 32px;
+      max-width: 480px;
+      width: 90vw;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    #settings-form h3 {
+      margin: 0 0 20px 0;
+      color: #222;
+      font-size: 1.3em;
+      text-align: center;
+    }
+    #settings-form label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+    }
+    #custom-prompt {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px 16px;
+      border: 1px solid rgba(200,200,200,0.3);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.25);
+      color: #222;
+      font-size: 1em;
+      resize: vertical;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      outline: none;
+      transition: border 0.2s;
+      box-sizing: border-box;
+    }
+    #custom-prompt:focus {
+      border: 1.5px solid #0078d4;
+      background: rgba(255,255,255,0.35);
+    }
+    .settings-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .settings-btn {
+      flex: 1;
+      padding: 12px 0;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.2s;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .settings-btn.save {
+      background: rgba(0,120,212,0.25);
+      color: #fff;
+    }
+    .settings-btn.save:hover {
+      background: rgba(0,95,163,0.35);
+    }
+    .settings-btn.cancel {
+      background: rgba(128,128,128,0.25);
+      color: #fff;
+    }
+    .settings-btn.cancel:hover {
+      background: rgba(96,96,96,0.35);
+    }
     #prompt-input {
       width: 95%;
       max-width: 520px;
@@ -207,11 +321,24 @@
   </div>
   <div id="glass-panel">
     <button id="close-panel">✕</button>
+    <button id="settings-panel">⚙</button>
     <div id="advice-title">人潮雷達</div>
     <div id="advice-content">請點選地圖上的檢查點或輸入需求，AI 將根據交通狀況與歷史資料給出最佳建議。</div>
     <div id="chat-history"></div>
     <input id="prompt-input" type="text" placeholder="請輸入需求，例如：我想從 a5 經過 a3 到 a2" />
     <button id="ask-btn">Ask for help</button>
+  </div>
+
+  <div id="settings-modal">
+    <div id="settings-form">
+      <h3>設定</h3>
+      <label for="custom-prompt">客製化提示詞：</label>
+      <textarea id="custom-prompt" placeholder="輸入您的客製化提示詞，例如：我希望AI回應更詳細一些，並提供具體的時間建議..."></textarea>
+      <div class="settings-buttons">
+        <button class="settings-btn cancel" id="cancel-settings">取消</button>
+        <button class="settings-btn save" id="save-settings">儲存</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -358,7 +485,8 @@
           navigator.geolocation.getCurrentPosition(function (position) {
             currentLat = position.coords.latitude;
             currentLon = position.coords.longitude;
-
+            //currentLat = 35.63278
+            //currentLon = 139.88056
             map.setCamera({ center: [currentLon, currentLat], zoom: 18 });
 
             const userPopup = new atlas.Popup({
@@ -405,6 +533,7 @@
       document.getElementById('ask-btn').addEventListener('click', async () => {
         const allLocations = crowdData.map(cp => cp.name); // 例如 ["K館", "福利社", ...]
         const prompt = document.getElementById('prompt-input').value.trim();
+        const customPrompt = localStorage.getItem('customPrompt') || '';
 
         appendMessage('user', prompt);
         document.getElementById('prompt-input').value = '';
@@ -417,7 +546,8 @@
             prompt,
             locations: allLocations,
             current_location: { lat: currentLat, lon: currentLon },
-            current_time: getCurrentTimeString()
+            current_time: getCurrentTimeString(),
+            custom_prompt: customPrompt
           })
         });
         const data = await response.json();
@@ -480,6 +610,58 @@
       closePanel.addEventListener('click', () => {
         glassPanel.classList.remove('open');
         setTimeout(() => { radarFab.style.display = 'flex'; }, 400);
+      });
+
+      // 設定功能
+      const settingsPanel = document.getElementById('settings-panel');
+      const settingsModal = document.getElementById('settings-modal');
+      const saveSettings = document.getElementById('save-settings');
+      const cancelSettings = document.getElementById('cancel-settings');
+      const customPromptInput = document.getElementById('custom-prompt');
+
+      // 載入已儲存的設定
+      const savedCustomPrompt = localStorage.getItem('customPrompt') || '';
+      customPromptInput.value = savedCustomPrompt;
+
+      settingsPanel.addEventListener('click', () => {
+        settingsModal.classList.add('open');
+      });
+
+      cancelSettings.addEventListener('click', () => {
+        settingsModal.classList.remove('open');
+        customPromptInput.value = savedCustomPrompt; // 恢復原值
+      });
+
+      saveSettings.addEventListener('click', () => {
+        const customPrompt = customPromptInput.value.trim();
+        localStorage.setItem('customPrompt', customPrompt);
+        settingsModal.classList.remove('open');
+        
+        // 顯示儲存成功訊息
+        const tempMsg = document.createElement('div');
+        tempMsg.textContent = '設定已儲存';
+        tempMsg.style.cssText = `
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(0,120,212,0.9);
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          z-index: 100;
+          font-size: 14px;
+        `;
+        document.body.appendChild(tempMsg);
+        setTimeout(() => tempMsg.remove(), 2000);
+      });
+
+      // 點擊背景關閉設定
+      settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) {
+          settingsModal.classList.remove('open');
+          customPromptInput.value = savedCustomPrompt; // 恢復原值
+        }
       });
 
       // Enter 送出訊息

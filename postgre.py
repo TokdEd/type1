@@ -14,7 +14,7 @@ db_name = os.getenv("DB_NAME")
 engine = create_engine(f'postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}')
 
 # 讀取 CSV 檔案
-df = pd.read_csv('data/data.csv')
+df = pd.read_csv('data/data_new.csv')
 
 # 修正時間與日期欄位格式
 df['date'] = pd.to_datetime(df['date']).dt.date

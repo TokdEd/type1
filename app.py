@@ -26,7 +26,7 @@ conn = psycopg2.connect(
     host=os.getenv("DB_HOST"),
     port=os.getenv("DB_PORT")
 )
-
+print("連線成功！")
 def round_time_to_half_hour(time_str):
     # 輸入 "14:17"，輸出 "14:00:00" 或 "14:30:00"
     h, m = map(int, time_str.split(':'))
@@ -43,6 +43,7 @@ def ask():
     locations = data.get('locations', [])  # 前端直接傳來所有地名
     current_location = data.get('current_location', {})
     current_time = data.get('current_time', '')
+    custom_prompt = data.get('custom_prompt', '')  # 新增：接收客製化提示詞
 
     rounded_time = round_time_to_half_hour(current_time)
     print("查詢時段:", rounded_time)
@@ -71,6 +72,11 @@ def ask():
         ai_prompt += f"\n地點 {loc}："
         for record in historic_data[loc]:
             ai_prompt += f"{record['date']} {rounded_time} 人數：{record['person_count']}；"
+    
+    # 新增：如果有客製化提示詞，加入到 prompt 中
+    if custom_prompt:
+        ai_prompt += f"\n\n客製化要求：{custom_prompt}"
+    
     ai_prompt += "根據目前位置、時間與歷史人流，判斷先去哪個地點較佳並說明原因。僅在使用者需求明確時提供建議；若不明確，先提問釐清。所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問。"
 
     print("送給AI的最終prompt：\n", ai_prompt)
@@ -80,9 +86,15 @@ def ask():
         "Content-Type": "application/json",
         "api-key": AZURE_OPENAI_KEY
     }
+    
+    # 修改系統提示詞，如果有客製化提示詞則整合進去
+    system_content = "根據目前位置、時間與歷史人流，判斷先去哪個地點較佳並說明原因。僅在使用者需求明確時提供建議；若不明確，先提問釐清。所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問。"
+    if custom_prompt:
+        system_content += f" 額外要求：{custom_prompt}"
+    
     payload = {
         "messages": [
-            {"role": "system", "content": "根據目前位置、時間與歷史人流，判斷先去哪個地點較佳並說明原因。僅在使用者需求明確時提供建議；若不明確，先提問釐清。所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問。"},
+            {"role": "system", "content": system_content},
             {"role": "user", "content": ai_prompt}
         ],
         "max_tokens": 1024,
@@ -218,4 +230,10 @@ def get_level_by_comparison(current_avg, overall_avg):
     return max(-1, min(1, normalized_diff))
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(port=5000,debug = True)
+
+
+
+
+
+
