@@ -45,9 +45,11 @@ def ask():
     current_location = data.get('current_location', {})
     current_time = data.get('current_time', '')
     custom_prompt = data.get('custom_prompt', '')  # 新增：接收客製化提示詞
+    chat_history = data.get('chat_history', [])  # 新增：接收對話歷史
 
     rounded_time = round_time_to_half_hour(current_time)
     print("查詢時段:", rounded_time)
+    print("對話歷史長度:", len(chat_history))
 
     cur = conn.cursor()
     
@@ -119,18 +121,74 @@ def ask():
     }
     
     # 修改系統提示詞，如果有客製化提示詞則整合進去
-    system_content = "根據目前位置、時間與歷史人流，判斷先去哪個地點較佳並說明原因。僅在使用者需求明確時提供建議；若不明確，先提問釐清。所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問。"
+    system_content = """你是一個人潮雷達助手，能夠根據目前位置、時間與歷史人流資料，判斷先去哪個地點較佳並說明原因。
+
+重要能力說明：
+1. 你可以看到並參考之前的對話歷史，提供連續性的對話體驗
+2. 當用戶詢問你是否能看到上下文或對話歷史時，請回答「是」
+3. 你應該參考歷史對話來理解用戶的完整需求和偏好
+
+語言理解重點：
+- 當用戶說"他亮紅燈"時，"他"指的是你剛才推薦的地點，"亮紅燈"表示該地點人潮很多
+- 當用戶使用"它"、"那裡"、"那個地方"等代詞時，通常指代之前討論的地點
+- 根據地圖顏色：紅燈=人很多，黃燈=人中等，綠燈=人較少
+
+回應原則：
+- 僅在使用者需求明確時提供建議；若不明確，先提問釐清
+- 所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問
+- 主動參考之前的對話來提供更好的建議
+- 理解代詞指代，提供連貫的對話體驗"""
+
     if custom_prompt:
-        system_content += f" 額外要求：{custom_prompt}"
+        system_content += f"\n\n額外要求：{custom_prompt}"
+    
+    # 構建包含對話歷史的訊息陣列
+    messages = [{"role": "system", "content": system_content}]
+    
+    # 添加對話歷史（如果有的話）
+    if chat_history:
+        print(f"添加 {len(chat_history)} 條對話歷史到上下文")
+        
+        # 更明確的上下文說明
+        context_intro = {
+            "role": "system", 
+            "content": f"""以下是與用戶的歷史對話記錄（共 {len(chat_history)} 條），請仔細閱讀並記住：
+
+重要提醒：
+- 當用戶說"他亮紅燈"或類似詞語時，通常指的是你剛才推薦的地點目前人潮很多
+- 用戶可能會用代詞（他、它、那裡）來指代之前討論的地點
+- 請根據完整的對話脈絡來理解用戶的需求
+
+歷史對話開始："""
+        }
+        messages.append(context_intro)
+        messages.extend(chat_history)
+        
+        # 更明確的分隔說明
+        context_separator = {
+            "role": "system",
+            "content": """歷史對話結束。
+
+現在用戶有新的詢問，請結合上述歷史對話來理解：
+- 如果用戶提到"他/它/那裡亮紅燈"，指的是之前推薦的地點現在人很多
+- 如果用戶使用代詞，請聯繫上下文理解指的是什麼
+- 提供連貫性的建議
+
+當前新詢問："""
+        }
+        messages.append(context_separator)
+    
+    # 添加當前用戶訊息
+    messages.append({"role": "user", "content": ai_prompt})
     
     payload = {
-        "messages": [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": ai_prompt}
-        ],
+        "messages": messages,
         "max_tokens": 1024,
         "temperature": 1.0
     }
+    
+    print("發送給AI的完整訊息陣列長度:", len(messages))
+    
     r = requests.post(AZURE_OPENAI_ENDPOINT, headers=headers, json=payload)
     try:
         result = r.json()

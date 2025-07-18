@@ -191,6 +191,12 @@
       #chat-history {
         max-height: 400px;
       }
+      #clear-chat {
+        left: 60px; /* 在小螢幕上稍微調整位置 */
+        width: 28px;
+        height: 28px;
+        font-size: 1em;
+      }
     }
     #close-panel {
       position: absolute;
@@ -227,6 +233,39 @@
     }
     #settings-panel:hover {
       background: rgba(0,0,0,0.18);
+    }
+    #clear-chat {
+      position: absolute;
+      top: 18px;
+      left: 66px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,69,58,0.3);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 1.1em;
+      color: #ff6b6b;
+      cursor: pointer;
+      z-index: 40;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(12px) saturate(180%);
+      -webkit-backdrop-filter: blur(12px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(255,69,58,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #clear-chat:hover {
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,69,58,0.5);
+      color: #ff453a;
+      transform: scale(1.08) translateY(-1px);
+      box-shadow: 0 6px 20px rgba(255,69,58,0.3);
+    }
+    #clear-chat:active {
+      transform: scale(0.96) translateY(0px);
+      box-shadow: 0 2px 8px rgba(255,69,58,0.25);
+      background: rgba(255,255,255,0.2);
     }
     #settings-modal {
       position: fixed;
@@ -443,6 +482,7 @@
   <div id="glass-panel">
     <button id="close-panel">✕</button>
     <button id="settings-panel">⚙</button>
+    <button id="clear-chat" title="清除對話歷史 (無法復原)">🗑️</button>
     <div id="advice-title">人潮雷達</div>
     <div id="advice-content">請點選地圖上的檢查點或輸入需求，AI 將根據交通狀況與歷史資料給出最佳建議。</div>
     <div id="chat-history"></div>
@@ -721,6 +761,97 @@
 
       const chatHistory = document.getElementById('chat-history');
 
+      // 短期記憶功能 - localStorage 對話歷史管理
+      const CHAT_STORAGE_KEY = 'crowdRadarChatHistory';
+      const MAX_CHAT_MESSAGES = 50; // 限制最大訊息數量以避免localStorage過大
+
+      // 檢測 localStorage 可用性
+      function isLocalStorageAvailable() {
+        try {
+          const test = '__localStorage_test__';
+          localStorage.setItem(test, test);
+          localStorage.removeItem(test);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      const hasLocalStorage = isLocalStorageAvailable();
+      if (!hasLocalStorage) {
+        console.warn('⚠️ localStorage 不可用，對話歷史功能已停用');
+      }
+
+      function saveChatHistory() {
+        if (!hasLocalStorage) return; // localStorage 不可用時直接返回
+        
+        try {
+          const messages = Array.from(chatHistory.children).map(msg => ({
+            role: msg.classList.contains('user') ? 'user' : 'ai',
+            content: msg.classList.contains('user') ? msg.textContent : msg.innerHTML,
+            timestamp: Date.now()
+          }));
+          
+          // 只保留最新的訊息
+          const limitedMessages = messages.slice(-MAX_CHAT_MESSAGES);
+          localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(limitedMessages));
+          
+          // 更新標題顯示訊息數量（可選的視覺回饋）
+          if (limitedMessages.length > 0) {
+            console.log(`💾 已保存 ${limitedMessages.length} 條對話記錄`);
+          }
+        } catch (error) {
+          console.warn('無法保存對話歷史:', error);
+        }
+      }
+
+      function loadChatHistory() {
+        if (!hasLocalStorage) return; // localStorage 不可用時直接返回
+        
+        try {
+          const savedHistory = localStorage.getItem(CHAT_STORAGE_KEY);
+          if (savedHistory) {
+            const messages = JSON.parse(savedHistory);
+            
+            // 清空現有對話
+            chatHistory.innerHTML = '';
+            
+            // 恢復對話記錄
+            messages.forEach(msg => {
+              const div = document.createElement('div');
+              div.className = 'message ' + msg.role;
+              
+              if (msg.role === 'ai') {
+                div.innerHTML = msg.content; // AI訊息支援HTML/Markdown
+              } else {
+                div.textContent = msg.content; // 用戶訊息純文字
+              }
+              
+              chatHistory.appendChild(div);
+            });
+            
+            // 滾動到底部
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            
+            console.log(`🔄 恢復了 ${messages.length} 條對話記錄`);
+          }
+        } catch (error) {
+          console.warn('無法載入對話歷史:', error);
+          // 如果載入失敗，清除損壞的數據
+          if (hasLocalStorage) {
+            localStorage.removeItem(CHAT_STORAGE_KEY);
+          }
+        }
+      }
+
+      function clearChatHistory() {
+        if (hasLocalStorage) {
+          localStorage.removeItem(CHAT_STORAGE_KEY);
+        }
+        chatHistory.innerHTML = '';
+        console.log('🗑 對話歷史已清除');
+      }
+
       function appendMessage(role, text) {
         const div = document.createElement('div');
         div.className = 'message ' + (role === 'user' ? 'user' : 'ai');
@@ -731,6 +862,45 @@
         }
         chatHistory.appendChild(div);
         chatHistory.scrollTop = chatHistory.scrollHeight;
+        
+        // 每次添加訊息後保存到localStorage
+        saveChatHistory();
+      }
+
+      function getChatContext() {
+        // 獲取對話上下文，用於發送給 AI
+        if (!hasLocalStorage) return [];
+        
+        try {
+          const savedHistory = localStorage.getItem(CHAT_STORAGE_KEY);
+          if (savedHistory) {
+            const messages = JSON.parse(savedHistory);
+            
+            // 過濾掉系統訊息（如清除歷史的提示）
+            const validMessages = messages.filter(msg => 
+              !msg.content.includes('對話歷史已清除') && 
+              !msg.content.includes('AI 正在思考中') &&
+              !msg.content.includes('✨') &&
+              msg.content.trim().length > 0
+            );
+            
+            // 增加上下文長度，取最近的 12 條對話（6組對話）
+            const recentMessages = validMessages.slice(-12).map(msg => ({
+              role: msg.role === 'user' ? 'user' : 'assistant',
+              content: msg.role === 'user' ? 
+                msg.content : 
+                msg.content.replace(/<[^>]*>/g, '').replace(/\n+/g, ' ').trim() // 清理 HTML 和多餘空行
+            }));
+            
+            console.log(`📝 準備發送 ${recentMessages.length} 條對話作為上下文`);
+            console.log('上下文內容預覽:', recentMessages.slice(-4)); // 顯示最近4條
+            return recentMessages;
+          }
+        } catch (error) {
+          console.warn('無法獲取對話上下文:', error);
+        }
+        
+        return [];
       }
 
       document.getElementById('ask-btn').addEventListener('click', async () => {
@@ -743,10 +913,15 @@
           return;
         }
 
+        // 獲取對話歷史作為上下文
+        const chatContext = getChatContext();
+
         appendMessage('user', prompt);
         document.getElementById('prompt-input').value = '';
         appendMessage('ai', 'AI 正在思考中...');
-        console.log('prompt', prompt);
+        console.log('📤 發送的用戶訊息:', prompt);
+        console.log('📚 發送的對話上下文:', chatContext);
+        console.log('🔢 上下文條數:', chatContext.length);
         
         try {
           const response = await fetch('/api/ask', {
@@ -757,7 +932,8 @@
               locations: allLocations,
               current_location: { lat: currentLat, lon: currentLon },
               current_time: getCurrentTimeString(),
-              custom_prompt: customPrompt
+              custom_prompt: customPrompt,
+              chat_history: chatContext // 新增：傳送對話歷史
             })
           });
           const data = await response.json();
@@ -826,6 +1002,7 @@
       const radarFab = document.getElementById('radar-fab');
       const glassPanel = document.getElementById('glass-panel');
       const closePanel = document.getElementById('close-panel');
+      const clearChatBtn = document.getElementById('clear-chat');
 
       radarFab.addEventListener('click', () => {
         glassPanel.classList.add('open');
@@ -834,6 +1011,13 @@
       closePanel.addEventListener('click', () => {
         glassPanel.classList.remove('open');
         setTimeout(() => { radarFab.style.display = 'flex'; }, 400);
+      });
+
+      clearChatBtn.addEventListener('click', () => {
+        if (confirm('確定要清除所有對話歷史嗎？此操作無法復原。')) {
+          clearChatHistory();
+          appendMessage('ai', '✨ 對話歷史已清除，我們重新開始吧！');
+        }
       });
 
       // 設定功能
@@ -894,13 +1078,21 @@
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           // 檢查是否有內容
-          if (this.value.trim()) {
+          const inputValue = this.value.trim();
+          console.log('Enter鍵按下，輸入內容:', inputValue);
+          
+          if (inputValue) {
             // 觸發發送訊息按鈕
             document.getElementById('ask-btn').click();
+            console.log('✅ 訊息已發送，輸入框應已清空');
+          } else {
+            console.log('⚠️ 輸入框為空，不發送訊息');
           }
+          
           // 確保輸入框保持焦點
           setTimeout(() => {
             this.focus();
+            console.log('🎯 輸入框重新獲得焦點');
           }, 100);
         }
       });
@@ -914,6 +1106,7 @@
 
       // 禁用地圖縮放（假設 map 變數可用）
       promptInput.addEventListener('focus', function() {
+        console.log('📝 輸入框獲得焦點');
         if (map && map.controls) {
           map.controls.remove('zoom');
         }
@@ -921,6 +1114,7 @@
         setTimeout(() => promptInput.scrollIntoView({behavior: 'smooth', block: 'center'}), 100);
       });
       promptInput.addEventListener('blur', function() {
+        console.log('📝 輸入框失去焦點');
         // 恢復地圖縮放
         // map.controls.add('zoom'); // 根據你的地圖API調整
       });
@@ -990,6 +1184,7 @@
       // 在地圖準備好後初始化時間控制器
       setTimeout(() => {
         initTimeControls();
+        loadChatHistory(); // 初始化時加載對話歷史
       }, 1000);
 
       // 動態顏色計算函數
