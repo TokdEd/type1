@@ -55,15 +55,11 @@ jobs:
       - name: Unzip artifact
         run: unzip release.zip
 
-      - name: Login to Azure
-        uses: azure/login@v2
+      - name: Login to Azure CLI
+        uses: azure/login@v1
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_... }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_... }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_... }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to Azure
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'hsh2025ac'
-          slot-name: 'Production'
+      - name: Deploy to Azure Web App
+        run: |
+          az webapp up --name hsh2025ac --resource-group 2025HSHEastUS2 --runtime "PYTHON:3.12"
