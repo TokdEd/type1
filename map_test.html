@@ -47,6 +47,107 @@
       box-shadow: 0 12px 40px 0 rgba(31,38,135,0.45);
       background: rgba(255,255,255,0.35);
     }
+    
+    /* 時間軸控制器 */
+    .time-control {
+      position: fixed;
+      bottom: 4vh;
+      transform: translateY(-50%);
+      z-index: 19;
+      display: flex;
+      align-items: center;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    
+    .time-control.left {
+      left: calc(50% - 200px);
+    }
+    
+    .time-control.right {
+      right: calc(50% - 200px);
+    }
+    
+    .time-slider-container {
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(12px) saturate(180%);
+      -webkit-backdrop-filter: blur(12px) saturate(180%);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 12px 20px;
+      box-shadow: 0 6px 24px rgba(31,38,135,0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+    
+    .time-label {
+      color: #222;
+      font-size: 11px;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.3);
+      letter-spacing: 0.5px;
+    }
+    
+    .time-slider {
+      width: 100px;
+      height: 4px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    
+    .time-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    .time-slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    .time-display {
+      color: #333;
+      font-size: 12px;
+      font-weight: 700;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+      min-width: 50px;
+      text-align: center;
+    }
+    
+    @media (max-width: 768px) {
+      .time-control.left {
+        left: 10px;
+      }
+      .time-control.right {
+        right: 10px;
+      }
+      .time-slider-container {
+        min-width: 100px;
+        padding: 10px 16px;
+      }
+      .time-slider {
+        width: 80px;
+      }
+    }
     #glass-panel {
       position: fixed;
       left: 50%;
@@ -316,8 +417,28 @@
 </head>
 <body>
   <div id="map"></div>
+  
+  <!-- 左側時間控制器 -->
+  <div class="time-control left" id="time-control-left">
+    <div class="time-slider-container">
+      <div class="time-label">往前 ←</div>
+      <input type="range" class="time-slider" id="time-slider-left" min="0" max="47" value="0" step="1">
+      <div class="time-display" id="time-display-left">00:00</div>
+    </div>
+  </div>
+  
+  <!-- 雷達按鈕 -->
   <div id="radar-fab">
     <canvas id="radar-canvas" width="60" height="60"></canvas>
+  </div>
+  
+  <!-- 右側時間控制器 -->
+  <div class="time-control right" id="time-control-right">
+    <div class="time-slider-container">
+      <div class="time-label">→ 往後</div>
+      <input type="range" class="time-slider" id="time-slider-right" min="0" max="47" value="0" step="1">
+      <div class="time-display" id="time-display-right">00:00</div>
+    </div>
   </div>
   <div id="glass-panel">
     <button id="close-panel">✕</button>
@@ -365,20 +486,82 @@
       let crowdData = [];
       let currentLat = null;
       let currentLon = null;
+      let currentTimeOffset = 0; // 時間偏移量，0表示當前時間，正數表示往後，負數表示往前
 
-      async function loadCheckpoints() {
+      // 時間軸相關函數
+      function indexToTime(index) {
+        // 將 0-47 的索引轉換為 00:00 到 23:30 的時間
+        const hours = Math.floor(index / 2);
+        const minutes = (index % 2) * 30;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      }
+
+      function timeToIndex(timeStr) {
+        // 將 HH:MM 時間轉換為 0-47 的索引
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 2 + (minutes >= 30 ? 1 : 0);
+      }
+
+      function getCurrentTimeIndex() {
+        // 獲取當前時間對應的索引
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        return hours * 2 + (minutes >= 30 ? 1 : 0);
+      }
+
+      function updateTimeDisplay(side, index) {
+        // 更新時間顯示
+        const timeStr = indexToTime(index);
+        document.getElementById(`time-display-${side}`).textContent = timeStr;
+      }
+
+      function getQueryTime() {
+        // 根據當前偏移量計算查詢時間
+        const currentIndex = getCurrentTimeIndex();
+        const targetIndex = Math.max(0, Math.min(47, currentIndex + currentTimeOffset));
+        return indexToTime(targetIndex);
+      }
+
+      async function loadCheckpoints(queryTime = null) {
         // 構建 API URL，如果有用戶位置就加上參數
         let apiUrl = '/api/checkpoints';
+        const params = new URLSearchParams();
+        
         if (currentLat !== null && currentLon !== null) {
-          apiUrl += `?lat=${currentLat}&lon=${currentLon}`;
+          params.append('lat', currentLat);
+          params.append('lon', currentLon);
           console.log(`使用用戶位置 (${currentLat}, ${currentLon}) 篩選最近的地點`);
         } else {
           console.log('沒有用戶位置，顯示所有地點');
         }
         
+        // 添加時間參數
+        if (queryTime) {
+          params.append('time', queryTime);
+          console.log(`查詢時間: ${queryTime}`);
+        }
+        
+        if (params.toString()) {
+          apiUrl += '?' + params.toString();
+        }
+        
         const res = await fetch(apiUrl);
         crowdData = await res.json();
         console.log(`載入了 ${crowdData.length} 個地點`);
+        
+        // 清除現有標記並重新添加
+        map.markers.clear();
+        
+        // 重新添加用戶標記（如果有的話）
+        if (currentLat !== null && currentLon !== null) {
+          const userPin = new atlas.HtmlMarker({
+            color: 'blue',
+            text: 'U',
+            position: [currentLon, currentLat]
+          });
+          map.markers.add(userPin);
+        }
         
         // 後端已經計算好 level，直接使用
         // 不需要再根據 person_count 決定 level
@@ -498,8 +681,8 @@
           navigator.geolocation.getCurrentPosition(function (position) {
             currentLat = position.coords.latitude;
             currentLon = position.coords.longitude;
-            currentLat = 35.6329
-            currentLon = 139.88056
+            //currentLat = 35.6329
+            //currentLon = 139.88056
             map.setCamera({ center: [currentLon, currentLat], zoom: 18 });
 
             const userPopup = new atlas.Popup({
@@ -555,29 +738,50 @@
         const prompt = document.getElementById('prompt-input').value.trim();
         const customPrompt = localStorage.getItem('customPrompt') || '';
 
+        // 防止發送空訊息
+        if (!prompt) {
+          return;
+        }
+
         appendMessage('user', prompt);
         document.getElementById('prompt-input').value = '';
         appendMessage('ai', 'AI 正在思考中...');
         console.log('prompt', prompt);
-        const response = await fetch('/api/ask', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt,
-            locations: allLocations,
-            current_location: { lat: currentLat, lon: currentLon },
-            current_time: getCurrentTimeString(),
-            custom_prompt: customPrompt
-          })
-        });
-        const data = await response.json();
+        
+        try {
+          const response = await fetch('/api/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt,
+              locations: allLocations,
+              current_location: { lat: currentLat, lon: currentLon },
+              current_time: getCurrentTimeString(),
+              custom_prompt: customPrompt
+            })
+          });
+          const data = await response.json();
 
-        // 移除「AI 正在思考中...」
-        const lastMsg = chatHistory.querySelector('.message.ai:last-child');
-        if (lastMsg && lastMsg.innerText === 'AI 正在思考中...') {
-          lastMsg.remove();
+          // 移除「AI 正在思考中...」
+          const lastMsg = chatHistory.querySelector('.message.ai:last-child');
+          if (lastMsg && lastMsg.innerText === 'AI 正在思考中...') {
+            lastMsg.remove();
+          }
+          appendMessage('ai', data.reply || 'AI 沒有回應');
+        } catch (error) {
+          console.error('發送訊息失敗:', error);
+          // 移除「AI 正在思考中...」
+          const lastMsg = chatHistory.querySelector('.message.ai:last-child');
+          if (lastMsg && lastMsg.innerText === 'AI 正在思考中...') {
+            lastMsg.remove();
+          }
+          appendMessage('ai', '訊息發送失敗，請稍後再試');
         }
-        appendMessage('ai', data.reply || 'AI 沒有回應');
+        
+        // 確保輸入框重新獲得焦點
+        setTimeout(() => {
+          promptInput.focus();
+        }, 100);
       });
 
       // 畫雷達圖
@@ -689,9 +893,24 @@
       promptInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
-          document.getElementById('ask-btn').click();
+          // 檢查是否有內容
+          if (this.value.trim()) {
+            // 觸發發送訊息按鈕
+            document.getElementById('ask-btn').click();
+          }
+          // 確保輸入框保持焦點
+          setTimeout(() => {
+            this.focus();
+          }, 100);
         }
       });
+
+      // 確保輸入框在發送後重新獲得焦點
+      // document.getElementById('ask-btn').addEventListener('click', function() {
+      //   setTimeout(() => {
+      //     promptInput.focus();
+      //   }, 100);
+      // });
 
       // 禁用地圖縮放（假設 map 變數可用）
       promptInput.addEventListener('focus', function() {
@@ -705,6 +924,73 @@
         // 恢復地圖縮放
         // map.controls.add('zoom'); // 根據你的地圖API調整
       });
+
+      // 初始化時間軸控制器
+      function initTimeControls() {
+        const leftSlider = document.getElementById('time-slider-left');
+        const rightSlider = document.getElementById('time-slider-right');
+        const currentIndex = getCurrentTimeIndex();
+        
+        // 設置初始值
+        leftSlider.value = 47; // 左側滑桿初始位於最右邊（現在時間）
+        rightSlider.value = 0; // 右側滑桿初始位於最左邊
+        updateTimeDisplay('left', currentIndex);
+        updateTimeDisplay('right', currentIndex);
+        
+        // 左側滑桿（往前）- 從右(47)往左(0)滑動查看過去
+        leftSlider.addEventListener('input', function(e) {
+          const value = parseInt(e.target.value);
+          // 值越小，時間越往前
+          const stepsBack = 47 - value; // 從右邊(47)開始，往左滑動
+          currentTimeOffset = -stepsBack;
+          
+          // 計算並顯示實際時間
+          const targetIndex = Math.max(0, currentIndex + currentTimeOffset);
+          updateTimeDisplay('left', targetIndex);
+          
+          // 重置右側滑桿
+          rightSlider.value = 0;
+          updateTimeDisplay('right', currentIndex);
+          
+          // 只有當時間偏移不為0時才更新地圖資料
+          if (currentTimeOffset !== 0) {
+            const queryTime = getQueryTime();
+            loadCheckpoints(queryTime);
+          } else {
+            loadCheckpoints(); // 回到當前時間，不傳遞時間參數
+          }
+        });
+        
+        // 右側滑桿（往後）- 從左(0)往右(47)滑動查看未來
+        rightSlider.addEventListener('input', function(e) {
+          const value = parseInt(e.target.value);
+          currentTimeOffset = value; // 左到右滑動表示往後
+          
+          // 計算並顯示實際時間
+          const targetIndex = Math.min(47, currentIndex + value);
+          updateTimeDisplay('right', targetIndex);
+          
+          // 重置左側滑桿到初始位置（最右邊）
+          leftSlider.value = 47;
+          updateTimeDisplay('left', currentIndex);
+          
+          // 只有當時間偏移不為0時才更新地圖資料
+          if (currentTimeOffset !== 0) {
+            const queryTime = getQueryTime();
+            loadCheckpoints(queryTime);
+          } else {
+            loadCheckpoints(); // 回到當前時間，不傳遞時間參數
+          }
+        });
+        
+        console.log('時間軸控制器初始化完成');
+        console.log(`當前時間索引: ${currentIndex} (${indexToTime(currentIndex)})`);
+      }
+      
+      // 在地圖準備好後初始化時間控制器
+      setTimeout(() => {
+        initTimeControls();
+      }, 1000);
 
       // 動態顏色計算函數
       function getDynamicColor(ratio) {

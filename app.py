@@ -174,17 +174,30 @@ def get_checkpoints():
     # 接收前端傳來的用戶位置參數
     user_lat = request.args.get('lat', type=float)
     user_lon = request.args.get('lon', type=float)
+    # 接收時間參數，格式為 HH:MM:SS，預設為當前時間
+    query_time = request.args.get('time', None)
     
     cur = conn.cursor()
     
-    # 使用新的時間計算邏輯
-    current_time = get_current_time_for_query()
+    # 如果沒有指定時間，使用當前時間邏輯
+    if query_time is None:
+        current_time = get_current_time_for_query()
+    else:
+        # 驗證時間格式並標準化
+        try:
+            # 確保時間格式為 HH:MM:SS
+            if len(query_time.split(':')) == 2:  # HH:MM 格式
+                query_time += ':00'
+            current_time = query_time
+        except:
+            current_time = get_current_time_for_query()
+    
     print(f"查詢時間: {current_time}")
     
     # 計算5天前的日期
     five_days_ago = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
     
-    # 查詢每個地點的當前時間平均人流量和整體平均人流量（最近5天）
+    # 查詢每個地點的指定時間平均人流量和整體平均人流量（最近5天）
     cur.execute("""
         SELECT 
             location,
@@ -197,7 +210,7 @@ def get_checkpoints():
         FROM people_flow 
         WHERE date >= %s
         GROUP BY location, latitude, longitude
-        HAVING COUNT(CASE WHEN time = %s THEN 1 END) >= 3  -- 當前時間至少要有3筆資料
+        HAVING COUNT(CASE WHEN time = %s THEN 1 END) >= 1  -- 降低門檻，至少要有1筆資料
     """, (current_time, current_time, five_days_ago, current_time))
     
     rows = cur.fetchall()
@@ -226,7 +239,8 @@ def get_checkpoints():
             "current_data_count": current_data_count,
             "overall_data_count": overall_data_count,
             "comparison_ratio": float(comparison_ratio),  # 轉換為 float 避免 Decimal 問題
-            "distance": None  # 預設距離為 None
+            "distance": None,  # 預設距離為 None
+            "query_time": current_time  # 回傳查詢時間
         })
     
     # 如果有用戶位置，計算距離並篩選最近的10個地點
@@ -253,7 +267,7 @@ def get_checkpoints():
     for i, item in enumerate(data):
         item['id'] = i + 1
     
-    print(f"回傳資料筆數: {len(data)}")
+    print(f"回傳資料筆數: {len(data)}, 查詢時間: {current_time}")
     return jsonify(data)
 
 @app.route('/api/azure-maps-key')
