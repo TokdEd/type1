@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>人潮雷達管理後台 | Admin Panel</title>
+  <meta name="viewport" initial-scale=1.0, width=device-width" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      padding: 40px;
+    }
+    
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      font-weight: 300;
+    }
+    
+    .admin-section {
+      background: rgba(255,255,255,0.8);
+      border-radius: 15px;
+      padding: 30px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    .section-title {
+      font-size: 1.5em;
+      color: #444;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 8px;
+      font-size: 1.1em;
+    }
+    
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e1e8ed;
+      border-radius: 10px;
+      font-size: 1em;
+      transition: all 0.3s ease;
+      background: rgba(255,255,255,0.9);
+    }
+    
+    input[type="number"]:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    
+    .coordinate-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 1.1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+      margin-top: 10px;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102,126,234,0.3);
+    }
+    
+    .btn:active {
+      transform: translateY(0);
+    }
+    
+    .btn-secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .current-status {
+      background: rgba(102,126,234,0.1);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(102,126,234,0.2);
+    }
+    
+    .status-item:last-child {
+      border-bottom: none;
+    }
+    
+    .status-label {
+      font-weight: 600;
+      color: #667eea;
+    }
+    
+    .status-value {
+      font-family: 'Courier New', monospace;
+      color: #333;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+    
+    .preset-locations {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    
+    .preset-btn {
+      background: rgba(102,126,234,0.1);
+      border: 2px solid #667eea;
+      color: #667eea;
+      padding: 15px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+    
+    .preset-btn:hover {
+      background: #667eea;
+      color: white;
+      transform: translateY(-2px);
+    }
+    
+    .message {
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 20px;
+      font-weight: 600;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .message.success {
+      background: rgba(46,204,113,0.1);
+      color: #27ae60;
+      border: 2px solid #2ecc71;
+    }
+    
+    .message.error {
+      background: rgba(231,76,60,0.1);
+      color: #c0392b;
+      border: 2px solid #e74c3c;
+    }
+    
+    .message.show {
+      opacity: 1;
+    }
+    
+    .back-link {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.9);
+      color: #667eea;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 25px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+    }
+    
+    .back-link:hover {
+      background: #667eea;
+      color: white;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <a href="/" class="back-link">← 返回主頁</a>
+  
+  <div class="container">
+    <h1>🎛️ 人潮雷達管理後台</h1>
+    
+    <!-- 當前狀態顯示 -->
+    <div class="admin-section">
+      <div class="section-title">📍 當前位置狀態</div>
+      <div class="current-status">
+        <div class="status-item">
+          <span class="status-label">緯度 (Latitude)</span>
+          <span class="status-value" id="current-lat">載入中...</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">經度 (Longitude)</span>
+          <span class="status-value" id="current-lon">載入中...</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">最後更新時間</span>
+          <span class="status-value" id="last-update">--</span>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="getCurrentLocation()">🔄 刷新當前位置</button>
+    </div>
+    
+    <!-- 手動設定座標 -->
+    <div class="admin-section">
+      <div class="section-title">🎯 手動設定座標</div>
+      <form id="coordinate-form">
+        <div class="coordinate-row">
+          <div class="form-group">
+            <label for="latitude">緯度 (Latitude)</label>
+            <input type="number" id="latitude" step="any" placeholder="例如：25.0330" required>
+            <small style="color:#666;">範圍：-90 到 90</small>
+          </div>
+          <div class="form-group">
+            <label for="longitude">經度 (Longitude)</label>
+            <input type="number" id="longitude" step="any" placeholder="例如：121.5654" required>
+            <small style="color:#666;">範圍：-180 到 180</small>
+          </div>
+        </div>
+        <button type="submit" class="btn">✅ 更新位置</button>
+      </form>
+    </div>
+    
+    <!-- 預設位置 -->
+    <div class="admin-section">
+      <div class="section-title">🗺️ 預設位置快速選擇</div>
+      <div class="preset-locations">
+        <button class="preset-btn" onclick="setPresetLocation(25.0330, 121.5654, '台北101')">
+          🏢 台北101
+        </button>
+        <button class="preset-btn" onclick="setPresetLocation(25.0478, 121.5170, '台北車站')">
+          🚉 台北車站
+        </button>
+        <button class="preset-btn" onclick="setPresetLocation(25.0408, 121.5440, '象山')">
+          🏔️ 象山
+        </button>
+        <button class="preset-btn" onclick="setPresetLocation(25.0375, 121.5645, '信義區')">
+          🛍️ 信義區
+        </button>
+        <button class="preset-btn" onclick="setPresetLocation(25.0419, 121.5103, '西門町')">
+          🎭 西門町
+        </button>
+        <button class="preset-btn" onclick="setPresetLocation( 22.987700,120.218900, '長榮路')">
+          🍜 長榮路
+        </button>
+        <button class="preset-btn" onclick="setPresetLocation(35.63278, 139.88056, '東京')">
+          🗾 東京 (測試用)
+        </button>
+        <button class="preset-btn" onclick="setPresetLocation(40.7128, -74.0060, '紐約')">
+          🗽 紐約 (測試用)
+        </button>
+      </div>
+    </div>
+    
+    <div id="message" class="message"></div>
+  </div>
+
+  <script>
+    // 全局變數
+    let currentLat = null;
+    let currentLon = null;
+    
+    // 頁面載入時獲取當前位置
+    document.addEventListener('DOMContentLoaded', function() {
+      getCurrentLocation();
+    });
+    
+    // 獲取當前位置
+    function getCurrentLocation() {
+      // 這裡我們需要從主頁面獲取當前位置
+      // 由於是在不同頁面，我們可以使用localStorage或者API
+      
+      // 嘗試從localStorage獲取
+      const savedLat = localStorage.getItem('currentLat');
+      const savedLon = localStorage.getItem('currentLon');
+      
+      if (savedLat && savedLon) {
+        currentLat = parseFloat(savedLat);
+        currentLon = parseFloat(savedLon);
+        updateCurrentStatus();
+      } else {
+        // 使用瀏覽器地理位置API
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            function(position) {
+              currentLat = position.coords.latitude;
+              currentLon = position.coords.longitude;
+              updateCurrentStatus();
+              saveToLocalStorage();
+            },
+            function(error) {
+              console.warn('無法獲取位置:', error);
+              // 使用預設台北位置
+              currentLat = 25.0330;
+              currentLon = 121.5654;
+              updateCurrentStatus();
+              saveToLocalStorage();
+            }
+          );
+        } else {
+          // 使用預設台北位置
+          currentLat = 25.0330;
+          currentLon = 121.5654;
+          updateCurrentStatus();
+          saveToLocalStorage();
+        }
+      }
+    }
+    
+    // 更新當前狀態顯示
+    function updateCurrentStatus() {
+      document.getElementById('current-lat').textContent = currentLat ? currentLat.toFixed(6) : '未設定';
+      document.getElementById('current-lon').textContent = currentLon ? currentLon.toFixed(6) : '未設定';
+      document.getElementById('last-update').textContent = new Date().toLocaleString('zh-TW');
+    }
+    
+    // 保存到localStorage
+    function saveToLocalStorage() {
+      if (currentLat !== null && currentLon !== null) {
+        localStorage.setItem('currentLat', currentLat.toString());
+        localStorage.setItem('currentLon', currentLon.toString());
+        
+        // 發送消息給主頁面（如果在同一瀏覽器標籤中）
+        try {
+          window.postMessage({
+            type: 'LOCATION_UPDATE',
+            lat: currentLat,
+            lon: currentLon
+          }, '*');
+        } catch (e) {
+          console.log('無法發送消息給主頁面');
+        }
+      }
+    }
+    
+    // 表單提交處理
+    document.getElementById('coordinate-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const lat = parseFloat(document.getElementById('latitude').value);
+      const lon = parseFloat(document.getElementById('longitude').value);
+      
+      if (isNaN(lat) || isNaN(lon)) {
+        showMessage('請輸入有效的數字', 'error');
+        return;
+      }
+      
+      if (lat < -90 || lat > 90) {
+        showMessage('緯度必須在 -90 到 90 之間', 'error');
+        return;
+      }
+      
+      if (lon < -180 || lon > 180) {
+        showMessage('經度必須在 -180 到 180 之間', 'error');
+        return;
+      }
+      
+      updateLocation(lat, lon, '手動設定');
+    });
+    
+    // 預設位置設定
+    function setPresetLocation(lat, lon, name) {
+      document.getElementById('latitude').value = lat;
+      document.getElementById('longitude').value = lon;
+      updateLocation(lat, lon, name);
+    }
+    
+    // 更新位置
+    function updateLocation(lat, lon, source) {
+      currentLat = lat;
+      currentLon = lon;
+      
+      updateCurrentStatus();
+      saveToLocalStorage();
+      
+      showMessage(`✅ 位置已更新為 ${source}：(${lat.toFixed(6)}, ${lon.toFixed(6)})`, 'success');
+      
+      // 清空表單
+      setTimeout(() => {
+        document.getElementById('latitude').value = '';
+        document.getElementById('longitude').value = '';
+      }, 2000);
+    }
+    
+    // 顯示訊息
+    function showMessage(text, type) {
+      const messageEl = document.getElementById('message');
+      messageEl.textContent = text;
+      messageEl.className = `message ${type} show`;
+      
+      setTimeout(() => {
+        messageEl.classList.remove('show');
+      }, 3000);
+    }
+    
+    // 監聽來自主頁面的消息
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'LOCATION_REQUEST') {
+        // 主頁面請求當前位置
+        window.postMessage({
+          type: 'LOCATION_RESPONSE',
+          lat: currentLat,
+          lon: currentLon
+        }, '*');
+      }
+    });
+  </script>
+</body>
+</html> 

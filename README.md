@@ -16,11 +16,12 @@ DB_NAME
 ### insert the exp data 
 ```
 pip install requirements.txt 
+python init_db.py
 python postgre.py
 ```
 ### launch backend service 
 ```
-python app.py
+gunicorn --bind 127.0.0.1:8000 app:app --reload
 ```
 ### preview 
-install the extension : Liveserver to preview the project 
+127.0.0.1:8000

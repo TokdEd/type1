@@ -814,6 +814,32 @@
     <button id="close-panel">✕</button>
     <button id="settings-panel">⚙</button>
     <button id="clear-chat" title="清除對話歷史 (無法復原)">🗑️</button>
+    <a href="/admin" target="_blank" style="
+      position: absolute;
+      top: 18px;
+      right: 108px;
+      background: rgba(0,120,212,0.15);
+      border: 1px solid rgba(0,120,212,0.3);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 1em;
+      color: #0078d4;
+      text-decoration: none;
+      z-index: 40;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(12px) saturate(180%);
+      -webkit-backdrop-filter: blur(12px) saturate(180%);
+      box-shadow: 0 4px 16px rgba(0,120,212,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    " 
+    title="管理後台 (設定位置)"
+    onmouseover="this.style.background='rgba(0,120,212,0.25)';this.style.borderColor='rgba(0,120,212,0.5)';this.style.transform='scale(1.08) translateY(-1px)'"
+    onmouseout="this.style.background='rgba(0,120,212,0.15)';this.style.borderColor='rgba(0,120,212,0.3)';this.style.transform='scale(1)'"
+    >🎛️</a>
     <div id="advice-title">人潮雷達</div>
     <div id="advice-content">請點選地圖上的檢查點或輸入需求，AI 將根據交通狀況與歷史資料給出最佳建議。</div>
     <div id="chat-history"></div>
@@ -1275,7 +1301,7 @@
             apiUrl += '?' + params.toString();
           }
           
-          console.log('🔍 API請求:', apiUrl);
+          console.log('API請求:', apiUrl);
           const res = await fetch(apiUrl);
           
           if (!res.ok) {
@@ -1299,7 +1325,7 @@
           }
           
           crowdData = data;
-          console.log(`✅ 載入了 ${crowdData.length} 個地點`);
+          console.log(`載入了 ${crowdData.length} 個地點`);
           
           // 清除現有標記並重新添加
           map.markers.clear();
@@ -1452,7 +1478,7 @@
           navigator.geolocation.getCurrentPosition(
             function (position) {
               // 成功獲取位置
-              console.log('✅ 成功獲取實際位置');
+              console.log('成功獲取實際位置');
               currentLat = position.coords.latitude;
               currentLon = position.coords.longitude;
               
@@ -1485,7 +1511,7 @@
             },
             function (error) {
               // 位置獲取失敗的處理
-              console.warn('⚠️ 位置獲取失敗:', error);
+              console.warn('位置獲取失敗:', error);
               console.warn('錯誤代碼:', error.code);
               console.warn('錯誤訊息:', error.message);
               
@@ -1510,7 +1536,7 @@
             }
           );
         } else {
-          console.warn('⚠️ 瀏覽器不支援地理位置服務');
+          console.warn('瀏覽器不支援地理位置服務');
           // 瀏覽器不支援位置服務時的備用處理
           currentLat = 25.034;
           currentLon = 121.5654;
@@ -1545,7 +1571,7 @@
 
       const hasLocalStorage = isLocalStorageAvailable();
       if (!hasLocalStorage) {
-        console.warn('⚠️ localStorage 不可用，對話歷史功能已停用');
+        console.warn('localStorage 不可用，對話歷史功能已停用');
       }
 
       function saveChatHistory() {
@@ -1564,7 +1590,7 @@
           
           // 更新標題顯示訊息數量（可選的視覺回饋）
           if (limitedMessages.length > 0) {
-            console.log(`💾 已保存 ${limitedMessages.length} 條對話記錄`);
+            console.log(`已保存 ${limitedMessages.length} 條對話記錄`);
           }
         } catch (error) {
           console.warn('無法保存對話歷史:', error);
@@ -1782,7 +1808,7 @@
       clearChatBtn.addEventListener('click', () => {
         if (confirm('確定要清除所有對話歷史嗎？此操作無法復原。')) {
           clearChatHistory();
-          appendMessage('ai', '✨ 對話歷史已清除，我們重新開始吧！');
+          appendMessage('ai', '對話歷史已清除');
         }
       });
 
@@ -1850,15 +1876,15 @@
           if (inputValue) {
             // 觸發發送訊息按鈕
             document.getElementById('ask-btn').click();
-            console.log('✅ 訊息已發送，輸入框應已清空');
+            console.log('訊息已發送，輸入框應已清空');
           } else {
-            console.log('⚠️ 輸入框為空，不發送訊息');
+            console.log('輸入框為空，不發送訊息');
           }
           
           // 確保輸入框保持焦點
           setTimeout(() => {
             this.focus();
-            console.log('🎯 輸入框重新獲得焦點');
+            console.log('輸入框重新獲得焦點');
           }, 100);
         }
       });
@@ -1872,7 +1898,7 @@
 
       // 禁用地圖縮放（假設 map 變數可用）
       promptInput.addEventListener('focus', function() {
-        console.log('📝 輸入框獲得焦點');
+        console.log('輸入框獲得焦點');
         if (map && map.controls) {
           map.controls.remove('zoom');
         }
@@ -1880,7 +1906,7 @@
         setTimeout(() => promptInput.scrollIntoView({behavior: 'smooth', block: 'center'}), 100);
       });
       promptInput.addEventListener('blur', function() {
-        console.log('📝 輸入框失去焦點');
+        console.log('輸入框失去焦點');
         // 恢復地圖縮放
         // map.controls.add('zoom'); // 根據你的地圖API調整
       });
@@ -1989,6 +2015,48 @@
         if (ratio <= 0.3) return 'HIGH';
         return 'VERY HIGH';
       }
+
+      // 監聽localStorage變化，以便接收admin頁面的位置更新
+      window.addEventListener('storage', function(e) {
+        if (e.key === 'currentLat' || e.key === 'currentLon') {
+          const newLat = parseFloat(localStorage.getItem('currentLat'));
+          const newLon = parseFloat(localStorage.getItem('currentLon'));
+          
+          if (!isNaN(newLat) && !isNaN(newLon)) {
+            console.log('🔄 接收到admin頁面的位置更新:', newLat, newLon);
+            
+            // 更新位置並重新載入地點資料
+            updateUserPosition(newLat, newLon);
+            
+            // 移動地圖視角到新位置
+            map.setCamera({ 
+              center: [newLon, newLat], 
+              zoom: 17,
+              duration: 1000 
+            });
+          }
+        }
+      });
+      
+      // 監聽頁面間的消息通信
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'LOCATION_UPDATE') {
+          const newLat = event.data.lat;
+          const newLon = event.data.lon;
+          
+          console.log('📩 接收到位置更新消息:', newLat, newLon);
+          
+          // 更新位置並重新載入地點資料
+          updateUserPosition(newLat, newLon);
+          
+          // 移動地圖視角到新位置
+          map.setCamera({ 
+            center: [newLon, newLat], 
+            zoom: 17,
+            duration: 1000 
+          });
+        }
+      });
     }
   </script>
 </body>

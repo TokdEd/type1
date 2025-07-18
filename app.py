@@ -37,6 +37,12 @@ def round_time_to_half_hour(time_str):
         m = 30
     return f'{h:02d}:{m:02d}:00'
 
+def get_next_hour_time(time_str):
+    # 输入 "14:30:00"，输出后1小时 "15:30:00"
+    h, m, s = map(int, time_str.split(':'))
+    h = (h + 1) % 24  # 处理23:xx -> 00:xx的情况
+    return f'{h:02d}:{m:02d}:{s:02d}'
+
 @app.route('/api/ask', methods=['POST'])
 def ask():
     data = request.json
@@ -83,7 +89,11 @@ def ask():
         print(f"篩選後地點 (前10近): {filtered_locations}")
     
     historic_data = {}
+    # 计算后1小时的时间
+    next_hour_time = get_next_hour_time(rounded_time)
+    
     for loc in filtered_locations:
+        # 查询当前时间的数据
         cur.execute("""
             SELECT date, person_count
             FROM people_flow
@@ -91,26 +101,64 @@ def ask():
             ORDER BY date DESC
             LIMIT 7
         """, (loc, rounded_time))
-        rows = cur.fetchall()
-        historic_data[loc] = [{"date": str(row[0]), "person_count": row[1]} for row in rows]
+        current_rows = cur.fetchall()
+        
+        # 查询后1小时的数据
+        cur.execute("""
+            SELECT date, person_count
+            FROM people_flow
+            WHERE location = %s AND time = %s
+            ORDER BY date DESC
+            LIMIT 7
+        """, (loc, next_hour_time))
+        next_hour_rows = cur.fetchall()
+        
+        historic_data[loc] = {
+            'current': [{"date": str(row[0]), "person_count": row[1]} for row in current_rows],
+            'next_hour': [{"date": str(row[0]), "person_count": row[1]} for row in next_hour_rows]
+        }
     cur.close()
     print("查詢到的歷史人流資料:", historic_data)
+
+    # 根据时间判断营业状况
+    hour = int(current_time.split(':')[0]) if current_time else 0
+    if 0 <= hour < 6:
+        time_status = "凌晨時段，絕大多數餐廳、商店、娛樂場所已關門營業"
+    elif 6 <= hour < 10:
+        time_status = "早晨時段，早餐店、咖啡廳開始營業，其他店家可能尚未開門"
+    elif 10 <= hour < 22:
+        time_status = "正常營業時段，大部分店家都在營業中"
+    else:  # 22-24點
+        time_status = "深夜時段，部分餐廳開始打烊，夜市、酒吧等夜間場所營業"
 
     # 組合 prompt 給 AI
     ai_prompt = f"""使用者目前位置：{current_location}
 目前時間：{current_time}（查詢歷史資料時段：{rounded_time}）
+【重要】時間狀況：{time_status}
 使用者需求：{prompt}
-歷史人流資料（已篩選距離最近的地點）："""
+歷史人流資料（已篩選距離最近的地點，包含當前時段 {rounded_time} 和後1小時 {next_hour_time}）："""
     for loc in filtered_locations:
-        ai_prompt += f"\n地點 {loc}："
-        for record in historic_data[loc]:
-            ai_prompt += f"{record['date']} {rounded_time} 人數：{record['person_count']}；"
+        ai_prompt += f"\n【地點 {loc}】"
+        ai_prompt += f"\n當前時段（{rounded_time}）："
+        # 检查是否有历史数据
+        if historic_data[loc]['current']:
+            for record in historic_data[loc]['current']:
+                ai_prompt += f"{record['date']} 人數：{record['person_count']}；"
+        else:
+            ai_prompt += "無歷史資料；"
+            
+        ai_prompt += f"\n後1小時（{next_hour_time}）："
+        if historic_data[loc]['next_hour']:
+            for record in historic_data[loc]['next_hour']:
+                ai_prompt += f"{record['date']} 人數：{record['person_count']}；"
+        else:
+            ai_prompt += "無歷史資料；"
     
     # 新增：如果有客製化提示詞，加入到 prompt 中
     if custom_prompt:
         ai_prompt += f"\n\n客製化要求：{custom_prompt}"
     
-    ai_prompt += "根據目前位置、時間與歷史人流，判斷先去哪個地點較佳並說明原因。僅在使用者需求明確時提供建議；若不明確，先提問釐清。所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問。"
+    ai_prompt += f"\n\n【營業狀況提醒】根據目前時間 {current_time}（{time_status}），請根據實際營業時間判斷地點是否營業。若用戶指出地點未營業，請承認並重新建議或誠實表示此時段缺乏營業選項。\n\n【時間建議】請分析當前時段({rounded_time})和後1小時({next_hour_time})的人流數據，判斷是建議「現在去」還是「稍後再去」會有更好的體驗。"
 
     print("送給AI的最終prompt：\n", ai_prompt)
 
@@ -128,16 +176,44 @@ def ask():
 2. 當用戶詢問你是否能看到上下文或對話歷史時，請回答「是」
 3. 你應該參考歷史對話來理解用戶的完整需求和偏好
 
+人流資料分析重點：
+- 你會收到兩個時間段的歷史人流資料：當前時段和後1小時
+- 利用這兩個時段的數據分析人流趨勢：
+  * 若後1小時人數通常比當前少：可建議「稍等一下再去會比較不擁擠」
+  * 若後1小時人數通常比當前多：可建議「現在去比較好，晚點會更擁擠」
+  * 若兩個時段差不多：可依其他因素決定
+- 分析多天的歷史資料來判斷趨勢的穩定性
+
+營業時間判斷重點：
+- 根據當前實際時間判斷營業狀況：
+  * 凌晨（00:00-06:00）：大部分餐廳、商店、娛樂場所已關門，只有24小時便利商店、部分夜市攤販、醫院等營業
+  * 早晨（06:00-10:00）：早餐店、咖啡廳、便利商店開始營業，其他店家可能尚未開門
+  * 上午至晚間（10:00-22:00）：大部分店家正常營業時間
+  * 深夜（22:00-24:00）：部分餐廳開始打烊，夜市、酒吧等夜間場所營業
+- 當用戶說"沒開"、"都沒有營業"、"他們都沒開"時，表示我之前推薦的地點確實已關門
+- 遇到這種情況應該：
+  1. 承認錯誤：「你說得對，這個時間點這些店家確實都關門了」
+  2. 重新思考：考慮真正可能營業的選項
+  3. 或誠實表示：「這個時間點可能沒有合適的營業場所」
+
 語言理解重點：
 - 當用戶說"他亮紅燈"時，"他"指的是你剛才推薦的地點，"亮紅燈"表示該地點人潮很多
 - 當用戶使用"它"、"那裡"、"那個地方"等代詞時，通常指代之前討論的地點
+- 當用戶說"操"、"聽不懂嗎"等詞語時，表示對你的回答不滿，需要重新理解問題
 - 根據地圖顏色：紅燈=人很多，黃燈=人中等，綠燈=人較少
+
+情緒處理：
+- 當用戶表達不滿或使用粗話時，保持耐心並承認之前的錯誤
+- 不要重複推薦明顯不營業的地點
+- 誠實承認資訊限制，而不是強行推薦
 
 回應原則：
 - 僅在使用者需求明確時提供建議；若不明確，先提問釐清
 - 所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問
 - 主動參考之前的對話來提供更好的建議
-- 理解代詞指代，提供連貫的對話體驗"""
+- 理解代詞指代，提供連貫的對話體驗
+- 承認營業時間限制，不要推薦明顯關門的店家
+- 善用當前時段和後1小時的人流數據，提供時間建議（現在去 vs 稍後去）"""
 
     if custom_prompt:
         system_content += f"\n\n額外要求：{custom_prompt}"
@@ -157,6 +233,8 @@ def ask():
 重要提醒：
 - 當用戶說"他亮紅燈"或類似詞語時，通常指的是你剛才推薦的地點目前人潮很多
 - 用戶可能會用代詞（他、它、那裡）來指代之前討論的地點
+- 當用戶說"沒開"、"都沒有營業"、"他們都沒開"時，表示推薦的地點確實關門了
+- 當用戶使用粗話（如"操"）或表達不滿時，表示對回答很不滿意，需要重新理解問題
 - 請根據完整的對話脈絡來理解用戶的需求
 
 歷史對話開始："""
@@ -167,11 +245,13 @@ def ask():
         # 更明確的分隔說明
         context_separator = {
             "role": "system",
-            "content": """歷史對話結束。
+            "content": f"""歷史對話結束。
 
 現在用戶有新的詢問，請結合上述歷史對話來理解：
 - 如果用戶提到"他/它/那裡亮紅燈"，指的是之前推薦的地點現在人很多
 - 如果用戶使用代詞，請聯繫上下文理解指的是什麼
+- 如果用戶表達不滿或說地點未營業，請承認錯誤並重新思考
+- 特別注意：當前時間 {current_time}（{time_status}），請根據實際時間判斷營業狀況
 - 提供連貫性的建議
 
 當前新詢問："""
@@ -415,6 +495,10 @@ def get_azure_maps_key():
 @app.route('/')
 def index():
     return send_from_directory('.', 'map_test.html')
+
+@app.route('/admin')
+def admin():
+    return send_from_directory('.', 'admin.html')
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
