@@ -4,7 +4,7 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 import psycopg2
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import math
 
 # 強制重新載入
@@ -199,6 +199,11 @@ def ask():
 
 def get_current_time_for_query():
     now = datetime.now()
+    print(f"🌍 系統時區資訊:")
+    print(f"   本地時間: {now}")
+    print(f"   UTC時間: {datetime.utcnow()}")
+    print(f"   時區偏移: {now - datetime.utcnow()}")
+    
     minute = now.minute
     
     # 計算距離當前小時0分和30分的時間差
@@ -227,6 +232,47 @@ def get_current_time_for_query():
     
     return f"{hour:02d}:{minute:02d}:00"
 
+def get_current_time_for_query_taiwan():
+    """使用台灣時區 (GMT+8) 的版本"""
+    # 創建台灣時區
+    taiwan_tz = timezone(timedelta(hours=8))
+    
+    # 獲取當前UTC時間，然後轉換為台灣時間
+    utc_now = datetime.now(timezone.utc)
+    taiwan_now = utc_now.astimezone(taiwan_tz)
+    
+    print(f"🌍 台灣時區資訊:")
+    print(f"   UTC時間: {utc_now}")
+    print(f"   台灣時間: {taiwan_now}")
+    
+    minute = taiwan_now.minute
+    
+    # 計算距離當前小時0分和30分的時間差
+    distance_to_zero = minute
+    distance_to_thirty = abs(minute - 30)
+    
+    # 計算距離下一個小時0分的時間差（跨小時情況）
+    distance_to_next_zero = 60 - minute
+    
+    # 選擇距離最近的時間點
+    if distance_to_zero <= distance_to_thirty and distance_to_zero <= distance_to_next_zero:
+        # 距離當前小時0分最近
+        hour = taiwan_now.hour
+        minute = 0
+    elif distance_to_thirty <= distance_to_next_zero:
+        # 距離當前小時30分最近
+        hour = taiwan_now.hour
+        minute = 30
+    else:
+        # 距離下一個小時0分最近
+        if taiwan_now.hour == 23:
+            hour = 0
+        else:
+            hour = taiwan_now.hour + 1
+        minute = 0
+    
+    return f"{hour:02d}:{minute:02d}:00"
+
 @app.route('/api/checkpoints')
 def get_checkpoints():
     try:
@@ -242,7 +288,7 @@ def get_checkpoints():
         
         # 如果沒有指定時間，使用當前時間邏輯
         if query_time is None:
-            current_time = get_current_time_for_query()
+            current_time = get_current_time_for_query_taiwan()
             print(f"📅 使用當前時間: {current_time}")
         else:
             # 驗證時間格式並標準化
@@ -255,7 +301,7 @@ def get_checkpoints():
                 print(f"🕐 處理後查詢時間: {current_time}")
             except Exception as time_error:
                 print(f"⚠️ 時間格式錯誤: {time_error}")
-                current_time = get_current_time_for_query()
+                current_time = get_current_time_for_query_taiwan()
         
         print(f"📊 最終查詢時間: {current_time}")
         
