@@ -452,10 +452,170 @@
       background: rgba(255,255,255,0.7);
       color: #222;
     }
+    /* 地點資訊卡樣式 */
+    .location-info-card {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.95);
+      width: 90vw;
+      max-width: 400px;
+      background: rgba(255,255,255,0.25);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-radius: 24px;
+      border: 1.5px solid rgba(255,255,255,0.18);
+      box-shadow: 0 12px 48px rgba(31,38,135,0.4);
+      padding: 24px;
+      z-index: 25;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .location-info-card.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) scale(1);
+    }
+    
+    .info-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .info-card-title {
+      font-size: 1.3em;
+      font-weight: 700;
+      color: #222;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.3);
+      margin: 0;
+    }
+    
+    .info-card-close {
+      background: rgba(0,0,0,0.1);
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      font-size: 1em;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .info-card-close:hover {
+      background: rgba(0,0,0,0.2);
+      color: #333;
+    }
+    
+    .info-card-content {
+      display: grid;
+      gap: 12px;
+    }
+    
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .info-label {
+      font-size: 0.9em;
+      color: #555;
+      font-weight: 500;
+    }
+    
+    .info-value {
+      font-size: 1em;
+      font-weight: 600;
+      color: #222;
+    }
+    
+    .info-value.crowd-level {
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 0.85em;
+      text-shadow: none;
+    }
+    
+    .crowd-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .crowd-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
+    }
+    
+    @media (max-width: 600px) {
+      .location-info-card {
+        width: 95vw;
+        bottom: 100px;
+        padding: 20px;
+      }
+      .info-card-title {
+        font-size: 1.2em;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  
+  <!-- 地點資訊卡 -->
+  <div id="location-info-card" class="location-info-card">
+    <div class="info-card-header">
+      <h3 id="info-card-title" class="info-card-title">地點名稱</h3>
+      <button id="info-card-close" class="info-card-close">✕</button>
+    </div>
+    <div class="info-card-content">
+      <div class="info-item">
+        <span class="info-label">目前人數</span>
+        <div class="crowd-status">
+          <div id="crowd-indicator" class="crowd-indicator"></div>
+          <span id="current-count" class="info-value">--</span>
+        </div>
+      </div>
+      <div class="info-item">
+        <span class="info-label">整體平均</span>
+        <span id="overall-avg" class="info-value">-- 人</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">擁擠程度</span>
+        <span id="crowd-level" class="info-value crowd-level">--</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">對比值</span>
+        <span id="comparison-ratio" class="info-value">--</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">資料筆數</span>
+        <span id="data-count" class="info-value">-- 筆</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">查詢時間</span>
+        <span id="query-time" class="info-value">--</span>
+      </div>
+      <div class="info-item" id="distance-item" style="display: none;">
+        <span class="info-label">距離</span>
+        <span id="distance-value" class="info-value">-- km</span>
+      </div>
+    </div>
+  </div>
   
   <!-- 左側時間控制器 -->
   <div class="time-control left" id="time-control-left">
@@ -528,6 +688,80 @@
       let currentLon = null;
       let currentTimeOffset = 0; // 時間偏移量，0表示當前時間，正數表示往後，負數表示往前
 
+      // 資訊卡管理
+      const infoCard = document.getElementById('location-info-card');
+      const infoCardClose = document.getElementById('info-card-close');
+      let currentShowingLocation = null; // 追蹤當前顯示的地點
+      
+      function showLocationInfo(checkpoint) {
+        // 更新資訊卡內容
+        document.getElementById('info-card-title').textContent = checkpoint.name;
+        document.getElementById('current-count').textContent = `${checkpoint.avg_count} 人`;
+        document.getElementById('overall-avg').textContent = `${checkpoint.overall_avg} 人`;
+        document.getElementById('comparison-ratio').textContent = checkpoint.comparison_ratio?.toFixed(3) || 'N/A';
+        document.getElementById('data-count').textContent = `${checkpoint.current_data_count} / ${checkpoint.overall_data_count} 筆`;
+        document.getElementById('query-time').textContent = checkpoint.query_time || getCurrentTimeString();
+        
+        // 處理距離顯示
+        const distanceItem = document.getElementById('distance-item');
+        const distanceValue = document.getElementById('distance-value');
+        if (checkpoint.distance !== null && checkpoint.distance !== undefined) {
+          const distanceKm = (checkpoint.distance * 111).toFixed(2); // 轉換為公里（粗略）
+          distanceValue.textContent = `${distanceKm} km`;
+          distanceItem.style.display = 'flex';
+        } else {
+          distanceItem.style.display = 'none';
+        }
+        
+        // 設定擁擠程度和顏色
+        const levelText = getLevelText(checkpoint.comparison_ratio);
+        const levelColor = getDynamicColor(checkpoint.comparison_ratio);
+        
+        document.getElementById('crowd-level').textContent = levelText;
+        document.getElementById('crowd-level').style.background = levelColor + '40'; // 40% 透明度
+        document.getElementById('crowd-level').style.color = levelColor;
+        
+        // 設定指示器顏色
+        const indicator = document.getElementById('crowd-indicator');
+        indicator.style.color = levelColor;
+        indicator.style.background = levelColor;
+        
+        // 記錄當前顯示的地點
+        currentShowingLocation = checkpoint.name;
+        
+        // 顯示資訊卡
+        infoCard.classList.add('show');
+        
+        console.log('📋 顯示地點資訊:', checkpoint.name);
+      }
+      
+      function hideLocationInfo() {
+        infoCard.classList.remove('show');
+        currentShowingLocation = null;
+        console.log('📋 隱藏地點資訊');
+      }
+      
+      function updateCurrentLocationInfo() {
+        // 如果有地點正在顯示，更新其資訊
+        if (currentShowingLocation && crowdData.length > 0) {
+          const checkpoint = crowdData.find(item => item.name === currentShowingLocation);
+          if (checkpoint) {
+            console.log('🔄 更新資訊卡內容:', currentShowingLocation);
+            showLocationInfo(checkpoint);
+          }
+        }
+      }
+      
+      // 關閉按鈕事件
+      infoCardClose.addEventListener('click', hideLocationInfo);
+      
+      // 點擊卡片外部隱藏
+      document.addEventListener('click', function(e) {
+        if (!infoCard.contains(e.target) && !e.target.closest('.custom-marker')) {
+          hideLocationInfo();
+        }
+      });
+
       // 時間軸相關函數
       function indexToTime(index) {
         // 將 0-47 的索引轉換為 00:00 到 23:30 的時間
@@ -564,48 +798,82 @@
       }
 
       async function loadCheckpoints(queryTime = null) {
-        // 構建 API URL，如果有用戶位置就加上參數
-        let apiUrl = '/api/checkpoints';
-        const params = new URLSearchParams();
-        
-        if (currentLat !== null && currentLon !== null) {
-          params.append('lat', currentLat);
-          params.append('lon', currentLon);
-          console.log(`使用用戶位置 (${currentLat}, ${currentLon}) 篩選最近的地點`);
-        } else {
-          console.log('沒有用戶位置，顯示所有地點');
+        try {
+          // 構建 API URL，如果有用戶位置就加上參數
+          let apiUrl = '/api/checkpoints';
+          const params = new URLSearchParams();
+          
+          if (currentLat !== null && currentLon !== null) {
+            params.append('lat', currentLat);
+            params.append('lon', currentLon);
+            console.log(`使用用戶位置 (${currentLat}, ${currentLon}) 篩選最近的地點`);
+          } else {
+            console.log('沒有用戶位置，顯示所有地點');
+          }
+          
+          // 添加時間參數
+          if (queryTime) {
+            params.append('time', queryTime);
+            console.log(`查詢時間: ${queryTime}`);
+          }
+          
+          if (params.toString()) {
+            apiUrl += '?' + params.toString();
+          }
+          
+          console.log('🔍 API請求:', apiUrl);
+          const res = await fetch(apiUrl);
+          
+          if (!res.ok) {
+            throw new Error(`API錯誤: ${res.status} ${res.statusText}`);
+          }
+          
+          const responseText = await res.text();
+          console.log('📥 API響應長度:', responseText.length);
+          
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch (jsonError) {
+            console.error('JSON解析錯誤:', jsonError);
+            console.error('響應內容:', responseText.substring(0, 500));
+            throw new Error('服務器返回無效的JSON數據');
+          }
+          
+          if (data.error) {
+            throw new Error(`服務器錯誤: ${data.error}`);
+          }
+          
+          crowdData = data;
+          console.log(`✅ 載入了 ${crowdData.length} 個地點`);
+          
+          // 清除現有標記並重新添加
+          map.markers.clear();
+          
+          // 重新添加用戶標記（如果有的話）
+          if (currentLat !== null && currentLon !== null) {
+            const userPin = new atlas.HtmlMarker({
+              color: 'blue',
+              text: 'U',
+              position: [currentLon, currentLat]
+            });
+            map.markers.add(userPin);
+          }
+          
+          // 後端已經計算好 level，直接使用
+          addCheckpointsToMap();
+          
+          // 如果資訊卡正在顯示，更新其內容
+          updateCurrentLocationInfo();
+          
+        } catch (error) {
+          console.error('❌ loadCheckpoints錯誤:', error);
+          // 用戶友善的錯誤提示
+          if (map && map.getCanvas) {
+            // 可以在地圖上顯示錯誤提示
+            console.warn('地點載入失敗，請稍後重試');
+          }
         }
-        
-        // 添加時間參數
-        if (queryTime) {
-          params.append('time', queryTime);
-          console.log(`查詢時間: ${queryTime}`);
-        }
-        
-        if (params.toString()) {
-          apiUrl += '?' + params.toString();
-        }
-        
-        const res = await fetch(apiUrl);
-        crowdData = await res.json();
-        console.log(`載入了 ${crowdData.length} 個地點`);
-        
-        // 清除現有標記並重新添加
-        map.markers.clear();
-        
-        // 重新添加用戶標記（如果有的話）
-        if (currentLat !== null && currentLon !== null) {
-          const userPin = new atlas.HtmlMarker({
-            color: 'blue',
-            text: 'U',
-            position: [currentLon, currentLat]
-          });
-          map.markers.add(userPin);
-        }
-        
-        // 後端已經計算好 level，直接使用
-        // 不需要再根據 person_count 決定 level
-        addCheckpointsToMap();
       }
 
       function addCheckpointsToMap() {
@@ -697,8 +965,19 @@
           setTimeout(() => {
             pin.getElement().addEventListener('click', (e) => {
               e.stopPropagation();
-              popup.open(map, pin.getOptions().position);
-              map.setCamera({ center: [checkpoint.lon, checkpoint.lat], zoom: 19 });
+              
+              // 移除彈出窗口，使用資訊卡替代
+              // popup.open(map, pin.getOptions().position);
+              
+              // 將地圖中心移動到點擊的地點
+              map.setCamera({ 
+                center: [checkpoint.lon, checkpoint.lat], 
+                zoom: 18,
+                duration: 800 // 平滑動畫
+              });
+              
+              // 顯示資訊卡
+              showLocationInfo(checkpoint);
             });
           }, 0);
         });
@@ -718,39 +997,87 @@
         
         // 嘗試獲得使用者即時位置
         if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(function (position) {
-            currentLat = position.coords.latitude;
-            currentLon = position.coords.longitude;
-            //currentLat = 35.6329
-            //currentLon = 139.88056
-            map.setCamera({ center: [currentLon, currentLat], zoom: 18 });
+          console.log('🔍 嘗試獲取用戶位置...');
+          
+          navigator.geolocation.getCurrentPosition(
+            function (position) {
+              // 成功獲取位置
+              console.log('✅ 成功獲取實際位置');
+              currentLat = position.coords.latitude;
+              currentLon = position.coords.longitude;
+              
+              // 臨時使用日本位置進行測試
+              currentLat = 35.6329;
+              currentLon = 139.88056;
+              
+              console.log(`📍 用戶位置設定為: (${currentLat}, ${currentLon})`);
+              map.setCamera({ center: [currentLon, currentLat], zoom: 18 });
 
-            const userPopup = new atlas.Popup({
-              content: `<div style="padding:5px"><b>你在這裡</b></div>`
-            });
-            const userPin = new atlas.HtmlMarker({
-              color: 'blue',
-              text: 'U',
-              position: [currentLon, currentLat]
-            });
-            map.markers.add(userPin);
-            setTimeout(() => {
-              userPin.getElement().addEventListener('click', (e) => {
-                e.stopPropagation();
-                userPopup.open(map, userPin.getOptions().position);
-                map.setCamera({ center: [currentLon, currentLat], zoom: 19 });
+              const userPopup = new atlas.Popup({
+                content: `<div style="padding:5px"><b>你在這裡</b></div>`
               });
-            }, 0);
-            
-            // 位置設定完成後，重新載入地點資料（使用距離篩選）
-            console.log('用戶位置已設定，重新載入最近的地點');
-            // 清除現有的地圖標記
-            map.markers.clear();
-            // 重新添加用戶標記
-            map.markers.add(userPin);
-            // 重新載入地點資料
-            loadCheckpoints();
-          });
+              const userPin = new atlas.HtmlMarker({
+                color: 'blue',
+                text: 'U',
+                position: [currentLon, currentLat]
+              });
+              map.markers.add(userPin);
+              
+              setTimeout(() => {
+                userPin.getElement().addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  userPopup.open(map, userPin.getOptions().position);
+                  map.setCamera({ center: [currentLon, currentLat], zoom: 19 });
+                });
+              }, 0);
+              
+              // 位置設定完成後，重新載入地點資料（使用距離篩選）
+              console.log('🔄 用戶位置已設定，重新載入最近的地點');
+              // 清除現有的地圖標記
+              map.markers.clear();
+              // 重新添加用戶標記
+              map.markers.add(userPin);
+              // 重新載入地點資料
+              loadCheckpoints();
+            },
+            function (error) {
+              // 位置獲取失敗的處理
+              console.warn('⚠️ 位置獲取失敗:', error);
+              console.warn('錯誤代碼:', error.code);
+              console.warn('錯誤訊息:', error.message);
+              
+              // 提供備用位置（預設台北）
+              currentLat = 25.034;
+              currentLon = 121.5654;
+              console.log(`📍 使用備用位置: (${currentLat}, ${currentLon})`);
+              
+              map.setCamera({ center: [currentLon, currentLat], zoom: 15 });
+              
+              // 顯示備用位置標記
+              const fallbackPin = new atlas.HtmlMarker({
+                color: 'orange',
+                text: '?',
+                position: [currentLon, currentLat]
+              });
+              map.markers.add(fallbackPin);
+              
+              // 重新載入地點資料
+              loadCheckpoints();
+            },
+            {
+              // 位置獲取選項
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 300000
+            }
+          );
+        } else {
+          console.warn('⚠️ 瀏覽器不支援地理位置服務');
+          // 瀏覽器不支援位置服務時的備用處理
+          currentLat = 25.034;
+          currentLon = 121.5654;
+          map.setCamera({ center: [currentLon, currentLat], zoom: 15 });
+          loadCheckpoints();
         }
       });
 

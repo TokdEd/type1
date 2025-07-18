@@ -229,104 +229,127 @@ def get_current_time_for_query():
 
 @app.route('/api/checkpoints')
 def get_checkpoints():
-    # 接收前端傳來的用戶位置參數
-    user_lat = request.args.get('lat', type=float)
-    user_lon = request.args.get('lon', type=float)
-    # 接收時間參數，格式為 HH:MM:SS，預設為當前時間
-    query_time = request.args.get('time', None)
-    
-    cur = conn.cursor()
-    
-    # 如果沒有指定時間，使用當前時間邏輯
-    if query_time is None:
-        current_time = get_current_time_for_query()
-    else:
-        # 驗證時間格式並標準化
-        try:
-            # 確保時間格式為 HH:MM:SS
-            if len(query_time.split(':')) == 2:  # HH:MM 格式
-                query_time += ':00'
-            current_time = query_time
-        except:
+    try:
+        # 接收前端傳來的用戶位置參數
+        user_lat = request.args.get('lat', type=float)
+        user_lon = request.args.get('lon', type=float)
+        # 接收時間參數，格式為 HH:MM:SS，預設為當前時間
+        query_time = request.args.get('time', None)
+        
+        print(f"🔍 API調用 - 位置: {user_lat}, {user_lon}, 時間: {query_time}")
+        
+        cur = conn.cursor()
+        
+        # 如果沒有指定時間，使用當前時間邏輯
+        if query_time is None:
             current_time = get_current_time_for_query()
-    
-    print(f"查詢時間: {current_time}")
-    
-    # 計算5天前的日期
-    five_days_ago = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
-    
-    # 查詢每個地點的指定時間平均人流量和整體平均人流量（最近5天）
-    cur.execute("""
-        SELECT 
-            location,
-            latitude,
-            longitude,
-            AVG(CASE WHEN time = %s THEN person_count END) as current_avg,
-            AVG(person_count) as overall_avg,
-            COUNT(CASE WHEN time = %s THEN 1 END) as current_data_count,
-            COUNT(*) as overall_data_count
-        FROM people_flow 
-        WHERE date >= %s
-        GROUP BY location, latitude, longitude
-        HAVING COUNT(CASE WHEN time = %s THEN 1 END) >= 1  -- 降低門檻，至少要有1筆資料
-    """, (current_time, current_time, five_days_ago, current_time))
-    
-    rows = cur.fetchall()
-    cur.close()
-    
-    data = []
-    for row in rows:
-        location, lat, lon, current_avg, overall_avg, current_data_count, overall_data_count = row
+        else:
+            # 驗證時間格式並標準化
+            try:
+                # 確保時間格式為 HH:MM:SS
+                if len(query_time.split(':')) == 2:  # HH:MM 格式
+                    query_time += ':00'
+                current_time = query_time
+            except Exception as time_error:
+                print(f"⚠️ 時間格式錯誤: {time_error}")
+                current_time = get_current_time_for_query()
         
-        # 如果沒有當前時間的資料，跳過
-        if current_avg is None:
-            continue
+        print(f"查詢時間: {current_time}")
+        
+        # 計算5天前的日期
+        five_days_ago = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+        print(f"查詢日期範圍: {five_days_ago} 到今天")
+        
+        # 查詢每個地點的指定時間平均人流量和整體平均人流量（最近5天）
+        sql_query = """
+            SELECT 
+                location,
+                latitude,
+                longitude,
+                AVG(CASE WHEN time = %s THEN person_count END) as current_avg,
+                AVG(person_count) as overall_avg,
+                COUNT(CASE WHEN time = %s THEN 1 END) as current_data_count,
+                COUNT(*) as overall_data_count
+            FROM people_flow 
+            WHERE date >= %s AND latitude IS NOT NULL AND longitude IS NOT NULL
+            GROUP BY location, latitude, longitude
+            HAVING COUNT(CASE WHEN time = %s THEN 1 END) >= 1  -- 降低門檻，至少要有1筆資料
+        """
+        
+        print("🔍 執行資料庫查詢...")
+        cur.execute(sql_query, (current_time, current_time, five_days_ago, current_time))
+        
+        rows = cur.fetchall()
+        print(f"查詢結果: {len(rows)} 個地點")
+        cur.close()
+        
+        data = []
+        for row in rows:
+            location, lat, lon, current_avg, overall_avg, current_data_count, overall_data_count = row
             
-        # 計算對比值
-        comparison_ratio = get_level_by_comparison(current_avg, overall_avg)
+            # 如果沒有當前時間的資料，跳過
+            if current_avg is None:
+                print(f"⚠️ {location} 沒有 {current_time} 的資料")
+                continue
+                
+            # 計算對比值
+            try:
+                comparison_ratio = get_level_by_comparison(current_avg, overall_avg)
+            except Exception as comp_error:
+                print(f"⚠️ 計算對比值錯誤 {location}: {comp_error}")
+                comparison_ratio = 0
+            
+            data.append({
+                "id": len(data) + 1,
+                "name": location,
+                "lat": lat,
+                "lon": lon,
+                "person_count": int(current_avg),
+                "level": "dynamic",  # 改為 dynamic 表示使用動態顏色
+                "avg_count": int(current_avg),
+                "overall_avg": int(overall_avg),
+                "current_data_count": current_data_count,
+                "overall_data_count": overall_data_count,
+                "comparison_ratio": float(comparison_ratio),  # 轉換為 float 避免 Decimal 問題
+                "distance": None,  # 預設距離為 None
+                "query_time": current_time  # 回傳查詢時間
+            })
         
-        data.append({
-            "id": len(data) + 1,
-            "name": location,
-            "lat": lat,
-            "lon": lon,
-            "person_count": int(current_avg),
-            "level": "dynamic",  # 改為 dynamic 表示使用動態顏色
-            "avg_count": int(current_avg),
-            "overall_avg": int(overall_avg),
-            "current_data_count": current_data_count,
-            "overall_data_count": overall_data_count,
-            "comparison_ratio": float(comparison_ratio),  # 轉換為 float 避免 Decimal 問題
-            "distance": None,  # 預設距離為 None
-            "query_time": current_time  # 回傳查詢時間
-        })
-    
-    # 如果有用戶位置，計算距離並篩選最近的10個地點
-    if user_lat is not None and user_lon is not None:
-        print(f"用戶位置: ({user_lat}, {user_lon})")
+        print(f"✅ 處理了 {len(data)} 個有效地點")
         
-        # 計算每個地點與用戶的距離
-        for item in data:
-            if item['lat'] is not None and item['lon'] is not None:
-                # 計算歐氏距離：sqrt((x1-x2)^2 + (y1-y2)^2)
-                distance = math.sqrt((user_lat - item['lat'])**2 + (user_lon - item['lon'])**2)
-                item['distance'] = distance
+        # 如果有用戶位置，計算距離並篩選最近的10個地點
+        if user_lat is not None and user_lon is not None:
+            print(f"用戶位置: ({user_lat}, {user_lon})")
+            
+            # 計算每個地點與用戶的距離
+            for item in data:
+                if item['lat'] is not None and item['lon'] is not None:
+                    # 計算歐氏距離：sqrt((x1-x2)^2 + (y1-y2)^2)
+                    distance = math.sqrt((user_lat - item['lat'])**2 + (user_lon - item['lon'])**2)
+                    item['distance'] = distance
+            
+            # 過濾掉沒有座標的地點，按距離排序，只取前10個
+            data_with_coords = [item for item in data if item['distance'] is not None]
+            data_with_coords.sort(key=lambda x: x['distance'])
+            data = data_with_coords[:10]
+            
+            print(f"篩選後地點 (最近10個): {[item['name'] for item in data]}")
+        else:
+            print("沒有提供用戶位置，顯示所有地點")
         
-        # 過濾掉沒有座標的地點，按距離排序，只取前10個
-        data_with_coords = [item for item in data if item['distance'] is not None]
-        data_with_coords.sort(key=lambda x: x['distance'])
-        data = data_with_coords[:10]
+        # 重新分配 ID
+        for i, item in enumerate(data):
+            item['id'] = i + 1
         
-        print(f"篩選後地點 (最近10個): {[item['name'] for item in data]}")
-    else:
-        print("沒有提供用戶位置，顯示所有地點")
-    
-    # 重新分配 ID
-    for i, item in enumerate(data):
-        item['id'] = i + 1
-    
-    print(f"回傳資料筆數: {len(data)}, 查詢時間: {current_time}")
-    return jsonify(data)
+        print(f"✅ 回傳資料筆數: {len(data)}, 查詢時間: {current_time}")
+        return jsonify(data)
+        
+    except Exception as e:
+        print(f"❌ /api/checkpoints 錯誤: {e}")
+        print(f"錯誤類型: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 @app.route('/api/azure-maps-key')
 def get_azure_maps_key():
