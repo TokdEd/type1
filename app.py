@@ -243,18 +243,21 @@ def get_checkpoints():
         # 如果沒有指定時間，使用當前時間邏輯
         if query_time is None:
             current_time = get_current_time_for_query()
+            print(f"📅 使用當前時間: {current_time}")
         else:
             # 驗證時間格式並標準化
             try:
+                print(f"🕐 原始查詢時間: {query_time}")
                 # 確保時間格式為 HH:MM:SS
                 if len(query_time.split(':')) == 2:  # HH:MM 格式
                     query_time += ':00'
                 current_time = query_time
+                print(f"🕐 處理後查詢時間: {current_time}")
             except Exception as time_error:
                 print(f"⚠️ 時間格式錯誤: {time_error}")
                 current_time = get_current_time_for_query()
         
-        print(f"查詢時間: {current_time}")
+        print(f"📊 最終查詢時間: {current_time}")
         
         # 計算5天前的日期
         five_days_ago = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
@@ -277,10 +280,18 @@ def get_checkpoints():
         """
         
         print("🔍 執行資料庫查詢...")
+        print(f"🗄️ SQL參數: current_time={current_time}, five_days_ago={five_days_ago}")
         cur.execute(sql_query, (current_time, current_time, five_days_ago, current_time))
         
         rows = cur.fetchall()
-        print(f"查詢結果: {len(rows)} 個地點")
+        print(f"📊 查詢結果: {len(rows)} 個地點")
+        
+        # 查詢資料庫中實際存在的時間值（用於調試）
+        debug_cur = conn.cursor()
+        debug_cur.execute("SELECT DISTINCT time FROM people_flow ORDER BY time LIMIT 10")
+        sample_times = [row[0] for row in debug_cur.fetchall()]
+        print(f"🕐 資料庫中的時間樣本: {sample_times}")
+        debug_cur.close()
         cur.close()
         
         data = []
