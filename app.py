@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import requests
 from flask_cors import CORS
 import os
@@ -199,6 +199,14 @@ def get_checkpoints():
 @app.route('/api/azure-maps-key')
 def get_azure_maps_key():
     return jsonify({"key": os.getenv("AZURE_MAPS_KEY")})
+
+@app.route('/')
+def index():
+    return send_from_directory('.', 'map_test.html')
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('.', filename)
 
 def get_level_by_avg(avg_count):
     if avg_count >= 30:

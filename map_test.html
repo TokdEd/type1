@@ -343,7 +343,7 @@
 
   <script>
     let key = '';
-    fetch('http://127.0.0.1:5000/api/azure-maps-key')
+    fetch('/api/azure-maps-key')
       .then(res => res.json())
       .then(data => {
         key = data.key;
@@ -367,7 +367,7 @@
       let currentLon = null;
 
       async function loadCheckpoints() {
-        const res = await fetch('http://127.0.0.1:5000/api/checkpoints');
+        const res = await fetch('/api/checkpoints');
         crowdData = await res.json();
         
         // 後端已經計算好 level，直接使用
@@ -539,7 +539,7 @@
         document.getElementById('prompt-input').value = '';
         appendMessage('ai', 'AI 正在思考中...');
         console.log('prompt', prompt);
-        const response = await fetch('http://127.0.0.1:5000/api/ask', {
+        const response = await fetch('/api/ask', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

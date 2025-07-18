@@ -1,4 +1,4 @@
-5name: Build and deploy Python app to Azure Web App - hsh2025ac
+name: Build and deploy Python app to Azure Web App - hsh2025ac
 
 on:
   push:
