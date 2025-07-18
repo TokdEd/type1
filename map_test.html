@@ -571,6 +571,177 @@
         font-size: 1.2em;
       }
     }
+    /* 用戶位置標記樣式 */
+    .user-marker {
+      position: relative;
+      width: 50px;
+      height: 50px;
+      cursor: grab;
+      transition: transform 0.2s ease;
+    }
+    
+    .user-marker:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+    
+    .user-marker:hover {
+      transform: scale(1.05);
+    }
+    
+    .user-icon {
+      width: 50px;
+      height: 50px;
+      background: #ff4444;
+      border-radius: 50%;
+      border: 4px solid #fff;
+      box-shadow: 0 4px 20px rgba(255,68,68,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      position: relative;
+      color: white;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .user-marker-pulse {
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      width: 66px;
+      height: 66px;
+      border: 3px solid #ff4444;
+      border-radius: 50%;
+      opacity: 0.7;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% {
+        transform: scale(0.8);
+        opacity: 0.6;
+      }
+      50% {
+        transform: scale(1.2);
+        opacity: 0.3;
+      }
+      100% {
+        transform: scale(1.4);
+        opacity: 0;
+      }
+    }
+    
+    .user-marker-tooltip {
+      position: absolute;
+      bottom: 45px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 1000;
+    }
+    
+    .user-marker:hover .user-marker-tooltip {
+      opacity: 1;
+    }
+    
+    /* 新的簡單用戶標記樣式 */
+    .simple-user-marker {
+      width: 40px;
+      height: 40px;
+      background: #ff3030;
+      border: 4px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 4px 15px rgba(255,48,48,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: white;
+      cursor: grab;
+      z-index: 1000;
+      transition: box-shadow 0.15s ease;
+      user-select: none;
+      will-change: transform;
+    }
+    
+    .simple-user-marker:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(255,48,48,0.9);
+    }
+    
+    .simple-user-marker:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+    
+    /* 液態玻璃樣式位置指示器 */
+    .glass-location-marker {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+    }
+    
+    .glass-marker-pulse {
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      width: 40px;
+      height: 40px;
+      border: 2px solid rgba(0,122,255,0.6);
+      border-radius: 50%;
+      opacity: 0.8;
+      animation: locationPulse 2s infinite;
+    }
+    
+    .glass-marker-core {
+      width: 24px;
+      height: 24px;
+      background: rgba(255,255,255,0.25);
+      backdrop-filter: blur(12px) saturate(180%);
+      -webkit-backdrop-filter: blur(12px) saturate(180%);
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+      box-shadow: 0 4px 16px rgba(0,122,255,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    
+    .glass-marker-dot {
+      width: 8px;
+      height: 8px;
+      background: #007AFF;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(0,122,255,0.8);
+    }
+    
+    @keyframes locationPulse {
+      0% {
+        transform: scale(0.8);
+        opacity: 0.8;
+      }
+      50% {
+        transform: scale(1.2);
+        opacity: 0.4;
+      }
+      100% {
+        transform: scale(1.4);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -687,6 +858,289 @@
       let currentLat = null;
       let currentLon = null;
       let currentTimeOffset = 0; // 時間偏移量，0表示當前時間，正數表示往後，負數表示往前
+      let userPin = null; // 用戶標記引用
+      let isDragging = false; // 拖拽狀態
+      let isLoadingCheckpoints = false; // 避免重複調用標記
+
+      // 簡單的液態玻璃樣式位置指示器
+      function createGlassLocationMarker(lat, lon) {
+        const markerElement = document.createElement('div');
+        markerElement.className = 'glass-location-marker';
+        markerElement.innerHTML = `
+          <div class="glass-marker-pulse"></div>
+          <div class="glass-marker-core">
+            <div class="glass-marker-dot"></div>
+          </div>
+        `;
+        
+        const marker = new atlas.HtmlMarker({
+          htmlContent: markerElement,
+          position: [lon, lat],
+          anchor: 'center'
+        });
+        
+        return marker;
+      }
+
+      // 新的簡單用戶標記函數
+      function createSimpleUserMarker(lat, lon) {
+        const markerElement = document.createElement('div');
+        markerElement.className = 'simple-user-marker';
+        markerElement.textContent = '我';
+        markerElement.title = '拖拽來移動位置';
+        
+        const marker = new atlas.HtmlMarker({
+          htmlContent: markerElement,
+          position: [lon, lat],
+          anchor: 'center'
+        });
+        
+        // 添加拖拽功能
+        let isDragMode = false;
+        let startX, startY, startPosition;
+        
+        // 鼠標按下事件（優化版本）
+        markerElement.addEventListener('mousedown', (e) => {
+          isDragMode = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          startPosition = marker.getOptions().position;
+          markerElement.style.cursor = 'grabbing';
+          markerElement.style.transform = 'scale(1.1)';
+          markerElement.style.transition = 'none'; // 拖拽時禁用過渡
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🖱 開始拖拽用戶位置');
+        });
+        
+        // 觸摸開始事件（優化版本）
+        markerElement.addEventListener('touchstart', (e) => {
+          isDragMode = true;
+          const touch = e.touches[0];
+          startX = touch.clientX;
+          startY = touch.clientY;
+          startPosition = marker.getOptions().position;
+          markerElement.style.cursor = 'grabbing';
+          markerElement.style.transform = 'scale(1.1)';
+          markerElement.style.transition = 'none'; // 拖拽時禁用過渡
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('👆 開始觸摸拖拽用戶位置');
+        }, { passive: false });
+        
+        // 全局移動事件（修復版本）
+        const handleMove = (e) => {
+          if (!isDragMode) return;
+          
+          e.preventDefault();
+          
+          const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+          const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+          
+          // 獲取地圖容器的邊界
+          const mapContainer = map.getCanvasContainer();
+          const rect = mapContainer.getBoundingClientRect();
+          
+          // 計算相對於地圖的像素位置
+          const mapX = clientX - rect.left;
+          const mapY = clientY - rect.top;
+          
+          // 使用Azure Maps的像素到座標轉換
+          try {
+            const pixel = [mapX, mapY];
+            const worldPosition = map.pixelsToPositions([pixel]);
+            if (worldPosition && worldPosition.length > 0) {
+              const newPosition = [worldPosition[0][0], worldPosition[0][1]];
+              marker.setOptions({ position: newPosition });
+            }
+          } catch (error) {
+            // 備用方法：使用簡單的數學轉換
+            const camera = map.getCamera();
+            const zoom = camera.zoom;
+            const center = camera.center;
+            
+            // 計算像素到度數的比例
+            const scale = 156543.03392 * Math.cos(center[1] * Math.PI / 180) / Math.pow(2, zoom);
+            const deltaLon = (mapX - rect.width / 2) * scale / 111320;
+            const deltaLat = -(mapY - rect.height / 2) * scale / 110540;
+            
+            const newPosition = [center[0] + deltaLon, center[1] + deltaLat];
+            marker.setOptions({ position: newPosition });
+          }
+        };
+        
+        // 全局結束事件（優化版本）
+        let loadTimeout;
+        const handleEnd = (e) => {
+          if (!isDragMode) return;
+          
+          isDragMode = false;
+          markerElement.style.cursor = 'grab';
+          markerElement.style.transform = 'scale(1)';
+          markerElement.style.transition = 'box-shadow 0.15s ease'; // 恢復過渡
+          
+          // 更新用戶位置變數
+          const finalPosition = marker.getOptions().position;
+          const newLat = finalPosition[1];
+          const newLon = finalPosition[0];
+          
+          console.log(`📍 用戶位置已更新: (${newLat.toFixed(6)}, ${newLon.toFixed(6)})`);
+          
+          // 檢查位置是否真的改變了（增加閾值避免微小變動）
+          const latDiff = Math.abs(currentLat - newLat);
+          const lonDiff = Math.abs(currentLon - newLon);
+          
+          if (latDiff > 0.001 || lonDiff > 0.001) { // 增加閾值
+            currentLat = newLat;
+            currentLon = newLon;
+            
+            // 清除之前的延遲載入
+            if (loadTimeout) clearTimeout(loadTimeout);
+            
+            // 延遲載入，避免拖拽過程中頻繁觸發
+            loadTimeout = setTimeout(() => {
+              console.log('🔄 位置已改變，重新載入地點資料');
+              loadCheckpoints();
+            }, 300); // 延遲300ms
+          }
+        };
+        
+        // 綁定全局事件
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+        document.addEventListener('touchmove', handleMove);
+        document.addEventListener('touchend', handleEnd);
+        
+        return marker;
+      }
+      
+      // 更新用戶位置
+      function updateUserPosition(lat, lon) {
+        // 檢查位置是否真的改變了
+        const positionChanged = (currentLat !== lat || currentLon !== lon);
+        
+        currentLat = lat;
+        currentLon = lon;
+        
+        if (userPin) {
+          map.markers.remove(userPin);
+        }
+        
+        userPin = createGlassLocationMarker(lat, lon);
+        map.markers.add(userPin);
+        
+        console.log(`📍 用戶位置: (${lat.toFixed(6)}, ${lon.toFixed(6)})`);
+        
+        // 只有在位置真正改變時才重新載入地點資料
+        if (positionChanged) {
+          console.log('🔄 位置已改變，重新載入地點資料');
+          loadCheckpoints();
+        }
+      }
+
+      // 創建可拖拽的用戶標記
+      function createUserMarker(lat, lon) {
+        // 創建自定義用戶標記HTML
+        const userMarkerElement = document.createElement('div');
+        userMarkerElement.className = 'user-marker';
+        userMarkerElement.innerHTML = `
+          <div class="user-marker-pulse"></div>
+          <div class="user-icon">我</div>
+          <div class="user-marker-tooltip">拖拽來移動位置</div>
+        `;
+
+        // 創建Azure Maps標記
+        userPin = new atlas.HtmlMarker({
+          htmlContent: userMarkerElement,
+          position: [lon, lat],
+          anchor: 'center',
+          draggable: false // 我們手動處理拖拽
+        });
+
+        // 添加拖拽事件處理
+        let startX, startY, startPosition;
+        
+        // 鼠標事件
+        userMarkerElement.addEventListener('mousedown', function(e) {
+          isDragging = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          startPosition = userPin.getOptions().position;
+          
+          userMarkerElement.style.cursor = 'grabbing';
+          e.preventDefault();
+          
+          console.log('🖱 開始拖拽用戶位置');
+        });
+
+        // 觸摸事件支持
+        userMarkerElement.addEventListener('touchstart', function(e) {
+          isDragging = true;
+          const touch = e.touches[0];
+          startX = touch.clientX;
+          startY = touch.clientY;
+          startPosition = userPin.getOptions().position;
+          
+          userMarkerElement.style.cursor = 'grabbing';
+          e.preventDefault();
+          
+          console.log('👆 開始觸摸拖拽用戶位置');
+        });
+
+        // 全局鼠標移動事件
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('touchmove', handleDragMove);
+
+        function handleDragMove(e) {
+          if (!isDragging) return;
+          
+          const clientX = e.clientX || e.touches[0].clientX;
+          const clientY = e.clientY || e.touches[0].clientY;
+          
+          const deltaX = clientX - startX;
+          const deltaY = clientY - startY;
+          
+          // 將像素移動轉換為地圖座標移動
+          const zoom = map.getCamera().zoom;
+          const scale = Math.pow(2, zoom);
+          const deltaLon = deltaX / scale * 0.0001;
+          const deltaLat = -deltaY / scale * 0.0001; // Y軸反向
+          
+          const newPosition = [
+            startPosition[0] + deltaLon,
+            startPosition[1] + deltaLat
+          ];
+          
+          // 更新標記位置
+          userPin.setOptions({ position: newPosition });
+        }
+
+        // 全局鼠標釋放事件
+        document.addEventListener('mouseup', handleDragEnd);
+        document.addEventListener('touchend', handleDragEnd);
+
+        function handleDragEnd(e) {
+          if (!isDragging) return;
+          
+          isDragging = false;
+          userMarkerElement.style.cursor = 'grab';
+          
+          // 獲取最終位置
+          const finalPosition = userPin.getOptions().position;
+          currentLon = finalPosition[0];
+          currentLat = finalPosition[1];
+          
+          console.log(`📍 用戶位置已更新: (${currentLat.toFixed(6)}, ${currentLon.toFixed(6)})`);
+          
+          // 重新載入地點資料以更新距離篩選
+          // loadCheckpoints(); // 避免循環調用
+          
+          // 如果資訊卡正在顯示，更新其內容
+          updateCurrentLocationInfo();
+        }
+
+        return userPin;
+      }
 
       // 資訊卡管理
       const infoCard = document.getElementById('location-info-card');
@@ -852,11 +1306,7 @@
           
           // 重新添加用戶標記（如果有的話）
           if (currentLat !== null && currentLon !== null) {
-            const userPin = new atlas.HtmlMarker({
-              color: 'blue',
-              text: 'U',
-              position: [currentLon, currentLat]
-            });
+            userPin = createGlassLocationMarker(currentLat, currentLon);
             map.markers.add(userPin);
           }
           
@@ -1007,8 +1457,8 @@
               currentLon = position.coords.longitude;
               
               // 臨時使用日本位置進行測試
-              currentLat = 35.6329;
-              currentLon = 139.88056;
+              //currentLat = 35.6329;
+              //currentLon = 139.88056;
               
               console.log(`📍 用戶位置設定為: (${currentLat}, ${currentLon})`);
               map.setCamera({ center: [currentLon, currentLat], zoom: 18 });
@@ -1016,29 +1466,22 @@
               const userPopup = new atlas.Popup({
                 content: `<div style="padding:5px"><b>你在這裡</b></div>`
               });
-              const userPin = new atlas.HtmlMarker({
-                color: 'blue',
-                text: 'U',
-                position: [currentLon, currentLat]
-              });
-              map.markers.add(userPin);
+              updateUserPosition(currentLat, currentLon);
               
               setTimeout(() => {
-                userPin.getElement().addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  userPopup.open(map, userPin.getOptions().position);
-                  map.setCamera({ center: [currentLon, currentLat], zoom: 19 });
-                });
+                // 添加點擊事件到用戶標記（如果需要）
+                const userMarkerElement = userPin.getElement();
+                if (userMarkerElement) {
+                  userMarkerElement.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    map.setCamera({ center: [currentLon, currentLat], zoom: 19 });
+                  });
+                }
               }, 0);
               
-              // 位置設定完成後，重新載入地點資料（使用距離篩選）
-              console.log('🔄 用戶位置已設定，重新載入最近的地點');
-              // 清除現有的地圖標記
-              map.markers.clear();
-              // 重新添加用戶標記
-              map.markers.add(userPin);
-              // 重新載入地點資料
-              loadCheckpoints();
+              // 位置設定完成後，設定用戶標記
+              console.log('🔄 用戶位置已設定');
+              updateUserPosition(currentLat, currentLon);
             },
             function (error) {
               // 位置獲取失敗的處理
@@ -1053,13 +1496,8 @@
               
               map.setCamera({ center: [currentLon, currentLat], zoom: 15 });
               
-              // 顯示備用位置標記
-              const fallbackPin = new atlas.HtmlMarker({
-                color: 'orange',
-                text: '?',
-                position: [currentLon, currentLat]
-              });
-              map.markers.add(fallbackPin);
+              // 使用備用位置
+              updateUserPosition(currentLat, currentLon);
               
               // 重新載入地點資料
               loadCheckpoints();
@@ -1077,6 +1515,7 @@
           currentLat = 25.034;
           currentLon = 121.5654;
           map.setCamera({ center: [currentLon, currentLat], zoom: 15 });
+          updateUserPosition(currentLat, currentLon);
           loadCheckpoints();
         }
       });
