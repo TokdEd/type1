@@ -12,120 +12,116 @@
     }
     
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f7;
       min-height: 100vh;
       padding: 20px;
+      color: #1d1d1f;
     }
     
     .container {
-      max-width: 800px;
+      max-width: 600px;
       margin: 0 auto;
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 20px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-      padding: 40px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      padding: 32px;
     }
     
     h1 {
       text-align: center;
-      color: #333;
-      margin-bottom: 30px;
-      font-size: 2.5em;
-      font-weight: 300;
+      color: #1d1d1f;
+      margin-bottom: 32px;
+      font-size: 2em;
+      font-weight: 600;
     }
     
     .admin-section {
-      background: rgba(255,255,255,0.8);
-      border-radius: 15px;
-      padding: 30px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 24px;
       margin-bottom: 20px;
-      border: 1px solid rgba(255,255,255,0.3);
+      border: 1px solid #e5e5e7;
     }
     
     .section-title {
-      font-size: 1.5em;
-      color: #444;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 10px;
+      font-size: 1.2em;
+      color: #1d1d1f;
+      margin-bottom: 16px;
+      font-weight: 600;
     }
     
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     
     label {
       display: block;
-      font-weight: 600;
-      color: #555;
-      margin-bottom: 8px;
-      font-size: 1.1em;
+      font-weight: 500;
+      color: #1d1d1f;
+      margin-bottom: 6px;
+      font-size: 0.95em;
     }
     
     input[type="number"], input[type="text"] {
       width: 100%;
-      padding: 12px 16px;
-      border: 2px solid #e1e8ed;
-      border-radius: 10px;
+      padding: 12px;
+      border: 1px solid #d2d2d7;
+      border-radius: 6px;
       font-size: 1em;
-      transition: all 0.3s ease;
-      background: rgba(255,255,255,0.9);
+      background: white;
+      transition: border-color 0.2s;
     }
     
     input[type="number"]:focus, input[type="text"]:focus {
       outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+      border-color: #007aff;
     }
     
     .coordinate-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      gap: 16px;
     }
     
     .btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #007aff;
       color: white;
       border: none;
-      padding: 15px 30px;
-      border-radius: 10px;
-      font-size: 1.1em;
-      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 1em;
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: background 0.2s;
       width: 100%;
-      margin-top: 10px;
     }
     
     .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(102,126,234,0.3);
-    }
-    
-    .btn:active {
-      transform: translateY(0);
+      background: #0056b3;
     }
     
     .btn-secondary {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      background: #6c757d;
+    }
+    
+    .btn-secondary:hover {
+      background: #545b62;
     }
     
     .current-status {
-      background: rgba(102,126,234,0.1);
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
+      background: #e3f2fd;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
     }
     
     .status-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(102,126,234,0.2);
+      padding: 8px 0;
+      border-bottom: 1px solid #bbdefb;
     }
     
     .status-item:last-child {
@@ -133,63 +129,63 @@
     }
     
     .status-label {
-      font-weight: 600;
-      color: #667eea;
+      font-weight: 500;
+      color: #1976d2;
     }
     
     .status-value {
-      font-family: 'Courier New', monospace;
-      color: #333;
-      background: rgba(255,255,255,0.8);
-      padding: 5px 10px;
-      border-radius: 5px;
+      font-family: 'SF Mono', Monaco, monospace;
+      color: #1d1d1f;
+      background: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #e3f2fd;
     }
     
     .preset-locations {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-top: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
     }
     
     .preset-btn {
-      background: rgba(102,126,234,0.1);
-      border: 2px solid #667eea;
-      color: #667eea;
-      padding: 15px;
-      border-radius: 10px;
-      font-weight: 600;
+      background: white;
+      border: 1px solid #d2d2d7;
+      color: #1d1d1f;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.2s;
       text-align: center;
     }
     
     .preset-btn:hover {
-      background: #667eea;
-      color: white;
-      transform: translateY(-2px);
+      background: #f5f5f7;
+      border-color: #007aff;
     }
     
     .message {
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 20px;
-      font-weight: 600;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 16px;
+      font-weight: 500;
       text-align: center;
       opacity: 0;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.3s;
     }
     
     .message.success {
-      background: rgba(46,204,113,0.1);
-      color: #27ae60;
-      border: 2px solid #2ecc71;
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
     }
     
     .message.error {
-      background: rgba(231,76,60,0.1);
-      color: #c0392b;
-      border: 2px solid #e74c3c;
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
     }
     
     .message.show {
@@ -200,20 +196,24 @@
       position: fixed;
       top: 20px;
       left: 20px;
-      background: rgba(255,255,255,0.9);
-      color: #667eea;
+      background: white;
+      color: #007aff;
       text-decoration: none;
-      padding: 10px 20px;
-      border-radius: 25px;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      backdrop-filter: blur(10px);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 500;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     
     .back-link:hover {
-      background: #667eea;
+      background: #007aff;
       color: white;
-      transform: translateY(-2px);
+    }
+    
+    small {
+      color: #8e8e93;
+      font-size: 0.85em;
     }
   </style>
 </head>
@@ -267,18 +267,6 @@
     <div class="admin-section">
       <div class="section-title">🗺️ 預設位置快速選擇</div>
       <div class="preset-locations">
-        <button class="preset-btn" onclick="setPresetLocation(25.0330, 121.5654, '台北101')">
-          🏢 台北101
-        </button>
-        <button class="preset-btn" onclick="setPresetLocation(25.0478, 121.5170, '台北車站')">
-          🚉 台北車站
-        </button>
-        <button class="preset-btn" onclick="setPresetLocation(25.0408, 121.5440, '象山')">
-          🏔️ 象山
-        </button>
-        <button class="preset-btn" onclick="setPresetLocation(25.0375, 121.5645, '信義區')">
-          🛍️ 信義區
-        </button>
         <button class="preset-btn" onclick="setPresetLocation(25.0419, 121.5103, '西門町')">
           🎭 西門町
         </button>
@@ -287,9 +275,6 @@
         </button>
         <button class="preset-btn" onclick="setPresetLocation(35.63278, 139.88056, '東京')">
           🗾 東京 (測試用)
-        </button>
-        <button class="preset-btn" onclick="setPresetLocation(40.7128, -74.0060, '紐約')">
-          🗽 紐約 (測試用)
         </button>
       </div>
     </div>

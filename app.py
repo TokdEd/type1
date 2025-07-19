@@ -61,6 +61,8 @@ def ask():
     
     # 如果有使用者位置，篩選最近的 10 個地點
     filtered_locations = locations
+    location_distances = {}  # 存储每个地点的距离信息
+    
     if current_location and 'lat' in current_location and 'lon' in current_location:
         user_lat = current_location['lat']
         user_lon = current_location['lon']
@@ -78,8 +80,11 @@ def ask():
         for location, lat, lon in location_coords:
             if lat is not None and lon is not None:
                 # 計算歐氏距離：sqrt((x1-x2)^2 + (y1-y2)^2)
-                distance = math.sqrt((user_lat - lat)**2 + (user_lon - lon)**2)
-                locations_with_distance.append((location, distance))
+                distance_deg = math.sqrt((user_lat - lat)**2 + (user_lon - lon)**2)
+                # 转换为大约的公里数 (1度约等于111公里)
+                distance_km = distance_deg * 111
+                locations_with_distance.append((location, distance_deg))
+                location_distances[location] = distance_km
         
         # 按距離排序，只取前 10 個
         locations_with_distance.sort(key=lambda x: x[1])
@@ -87,6 +92,7 @@ def ask():
         
         print(f"使用者位置: ({user_lat}, {user_lon})")
         print(f"篩選後地點 (前10近): {filtered_locations}")
+        print(f"距離資訊: {location_distances}")
     
     historic_data = {}
     # 计算后1小时的时间
@@ -139,6 +145,15 @@ def ask():
 歷史人流資料（已篩選距離最近的地點，包含當前時段 {rounded_time} 和後1小時 {next_hour_time}）："""
     for loc in filtered_locations:
         ai_prompt += f"\n【地點 {loc}】"
+        
+        # 添加距离信息
+        if loc in location_distances:
+            distance_km = location_distances[loc]
+            if distance_km > 20:
+                ai_prompt += f"\n距離：{distance_km:.1f}km ⚠️ 距離較遠，參考價值較低"
+            else:
+                ai_prompt += f"\n距離：{distance_km:.1f}km"
+        
         ai_prompt += f"\n當前時段（{rounded_time}）："
         # 检查是否有历史数据
         if historic_data[loc]['current']:
@@ -158,7 +173,7 @@ def ask():
     if custom_prompt:
         ai_prompt += f"\n\n客製化要求：{custom_prompt}"
     
-    ai_prompt += f"\n\n【營業狀況提醒】根據目前時間 {current_time}（{time_status}），請根據實際營業時間判斷地點是否營業。若用戶指出地點未營業，請承認並重新建議或誠實表示此時段缺乏營業選項。\n\n【時間建議】請分析當前時段({rounded_time})和後1小時({next_hour_time})的人流數據，判斷是建議「現在去」還是「稍後再去」會有更好的體驗。"
+    ai_prompt += f"\n\n【營業狀況提醒】根據目前時間 {current_time}（{time_status}），請根據實際營業時間判斷地點是否營業。若用戶指出地點未營業，請承認並重新建議或誠實表示此時段缺乏營業選項。\n\n【時間建議】請分析當前時段({rounded_time})和後1小時({next_hour_time})的人流數據，判斷是建議「現在去」還是「稍後再去」會有更好的體驗。\n\n【回應要求】回答務必精簡，控制在50字內，格式：「建議XX，原因：YY」或直接「去XX，因為YY」。"
 
     print("送給AI的最終prompt：\n", ai_prompt)
 
@@ -183,6 +198,13 @@ def ask():
   * 若後1小時人數通常比當前多：可建議「現在去比較好，晚點會更擁擠」
   * 若兩個時段差不多：可依其他因素決定
 - 分析多天的歷史資料來判斷趨勢的穩定性
+
+距離分析重點：
+- 每個地點都會提供距離資訊（公里）
+- 距離超過20km的地點會標註「⚠️ 距離較遠，參考價值較低」
+- 建議優先考慮距離較近的地點（通常10km以內）
+- 如果用戶明確要求遠距離地點，可以提及交通時間和成本
+- 距離太遠的地點可以建議「距離較遠，建議考慮較近的選項」
 
 營業時間判斷重點：
 - 根據當前實際時間判斷營業狀況：
@@ -209,11 +231,15 @@ def ask():
 
 回應原則：
 - 僅在使用者需求明確時提供建議；若不明確，先提問釐清
-- 所有回應務必精簡直接，省略贅詞，只提供結論與原因或精簡提問
+- 所有回應務必極度精簡，直接給結論，避免冗詞贅字
+- 建議格式：「去XX，因為YY」或「建議XX，原因：YY」
+- 時間建議直接說：「現在去」或「1小時後去更好」
+- 距離提醒簡化：「較遠，建議就近選擇」
 - 主動參考之前的對話來提供更好的建議
 - 理解代詞指代，提供連貫的對話體驗
 - 承認營業時間限制，不要推薦明顯關門的店家
-- 善用當前時段和後1小時的人流數據，提供時間建議（現在去 vs 稍後去）"""
+- 善用當前時段和後1小時的人流數據，提供時間建議（現在去 vs 稍後去）
+- 回應控制在50字以內，重點突出，省略解釋性文字"""
 
     if custom_prompt:
         system_content += f"\n\n額外要求：{custom_prompt}"
